@@ -1,0 +1,19 @@
+[Unit]
+Description=Jarvis War Room Dashboard Frontend (SPA static server)
+After=network.target
+
+[Service]
+EnvironmentFile=/home/ubuntu/.hermes/profiles/jarvis/plugins/jarvis-dashboard/state/dashboard.env
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/.hermes/profiles/jarvis/plugins/jarvis-dashboard
+Environment=PATH=/usr/bin:/bin
+ExecStart=/usr/bin/python3 /home/ubuntu/.hermes/profiles/jarvis/plugins/jarvis-dashboard/spa_server.py 8503 /home/ubuntu/.hermes/profiles/jarvis/plugins/jarvis-dashboard/frontend-react/dist 127.0.0.1
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

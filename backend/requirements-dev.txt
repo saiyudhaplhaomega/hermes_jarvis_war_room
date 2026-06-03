@@ -1,0 +1,4 @@
+# Development/test-only dependencies for Jarvis War Room backend tests.
+# Runtime dependencies remain in requirements.txt.
+pytest>=9.0
+httpx2>=2.3

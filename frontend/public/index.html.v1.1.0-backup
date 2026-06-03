@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jarvis War Room Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap');
+  body { font-family: 'Inter', sans-serif; background:#0b0f19; color:#e5e7eb; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .card { background:#111827; border:1px solid #1f2937; border-radius:12px; padding:16px; }
+  .kanban-col { min-height:180px; background:#0f172a; border-radius:8px; padding:10px; }
+  .kanban-card { background:#1e293b; border-radius:6px; padding:10px; margin-bottom:8px; font-size:13px; }
+  .ekg { height:60px; width:100%; position:relative; overflow:hidden; background:#0b0f19; border-top:1px solid #1f2937; }
+  .tier-badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:10px; font-weight:700; text-transform:uppercase; }
+  .tier-0 { background:#374151; color:#d1d5db; }
+  .tier-1 { background:#1e40af; color:#bfdbfe; }
+  .tier-2 { background:#b45309; color:#fde68a; }
+  .tier-3 { background:#991b1b; color:#fecaca; }
+  .audit-strip { font-size:10px; font-family:'JetBrains Mono',monospace; white-space:nowrap; overflow:hidden; position:fixed; bottom:0;left:0;right:0;background:#0b0f19;border-top:1px solid #1f2937;z-index:90;height:28px;display:flex;align-items:center; padding-left:12px;}
+  .audit-row { display:inline-block; margin-right:18px; }
+  .audit-info { color:#6b7280; }
+  .audit-warn { color:#f59e0b; }
+  .audit-error { color:#ef4444; }
+  #session-drawer { position:fixed; bottom:28px; left:0; right:0; height:0; background:#0f172a; border-top:2px solid #1f2937; z-index:95; overflow:hidden; transition:height 0.3s ease; }
+  #session-drawer.open { height:320px; }
+  .tab-btn { padding:6px 14px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer; border:1px solid #1f2937; background:#111827; color:#9ca3af; transition:all 0.2s; }
+  .tab-btn.active { background:#1e3a5f; color:#bfdbfe; border-color:#3b82f6; }
+  .orb { width:48px; height:48px; border-radius:50%; box-shadow: 0 0 14px currentColor, inset 0 0 8px rgba(255,255,255,0.2); animation: pulse 3s infinite ease-in-out; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#fff; }
+  @keyframes pulse { 0%{transform:scale(1);opacity:.9} 50%{transform:scale(1.08);opacity:1} 100%{transform:scale(1);opacity:.9} }
+  @keyframes slideIn { from{transform:translateX(120%);opacity:0} to{transform:translateX(0);opacity:1} }
+</style>
+</head>
+<body class="min-h-screen pb-7">
+
+<!-- XP Bar -->
+<div class="fixed top-0 left-0 right-0 z-[100] bg-gray-900/90 border-b border-gray-800 backdrop-blur">
+  <div class="flex items-center justify-between px-4 py-1">
+    <div class="flex items-center gap-2 text-[10px] text-gray-400 mono">
+      <span>WAR ROOM</span>
+      <span class="text-gray-700">|</span>
+      <span id="xp-bar" class="relative w-40 h-3 bg-gray-800 rounded-full overflow-hidden"></span>
+    </div>
+    <div class="flex items-center gap-3 text-xs text-gray-400 mono">
+      <span id="metric-tokens">Tokens: 0</span>
+      <span id="metric-cost">Cost: $0.00</span>
+      <span id="metric-budget" class="text-green-400">Budget: $50</span>
+      <span id="conn-dot" class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+      <span id="conn-text" class="text-[10px]">WS</span>
+    </div>
+  </div>
+</div>
+
+<!-- Header -->
+<header class="border-b border-gray-800 px-6 py-4 flex items-center justify-between mt-8">
+  <div class="flex items-center gap-3">
+    <div class="w-8 h-8 rounded bg-indigo-600 flex items-center justify-center" style="font-family:'JetBrains Mono',monospace">J</div>
+    <h1 class="text-lg font-bold tracking-tight text-white">Jarvis War Room <span class="text-gray-500 font-normal">v1.1.0</span></h1>
+  </div>
+  <div class="flex items-center gap-2">
+    <button onclick="toggleDrawer('main')" class="tab-btn active" id="btn-main">Main</button>
+    <button onclick="toggleDrawer('sessions')" class="tab-btn" id="btn-sessions">Conversations</button>
+    <button onclick="toggleDrawer('discord')" class="tab-btn" id="btn-discord">Discord</button>
+  </div>
+</header>
+
+<!-- Main Grid -->
+<main class="p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+  <!-- AGENT CONSTELLATION -->
+  <section class="lg:col-span-2 card flex flex-col gap-4">
+    <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+      <h2 class="text-sm font-bold uppercase tracking-wider text-gray-300">Agent Constellation</h2>
+      <span class="text-xs text-gray-500 mono" id="agent-count">0 alive</span>
+    </div>
+    <div id="constellation" style="height:240px;border-radius:12px;overflow:hidden;background:radial-gradient(circle at 50% 50%,#111827 0%,#0b0f19 100%);"></div>
+    <div class="flex gap-4 overflow-x-auto" id="agent-list"></div>
+  </section>
+
+  <!-- MEMORY NEXUS -->
+  <section class="card flex flex-col gap-4">
+    <div class="border-b border-gray-800 pb-2">
+      <h2 class="text-sm font-bold uppercase tracking-wider text-gray-300">Memory Nexus</h2>
+    </div>
+    <div class="space-y-3 mono text-xs" id="memory-panel">
+      <div class="flex justify-between"><span class="text-gray-400">Pending</span><span id="mem-pending" class="text-amber-400">0</span></div>
+      <div class="flex justify-between"><span class="text-gray-400">Approved</span><span id="mem-approved" class="text-green-400">0</span></div>
+      <div class="flex justify-between"><span class="text-gray-400">Contradictions</span><span id="mem-contra" class="text-red-400">0</span></div>
+    </div>
+    <div id="dna-helix" class="mt-auto"></div>
+  </section>
+
+  <!-- DECISION LOG -->
+  <section class="card flex flex-col gap-4">
+    <div class="border-b border-gray-800 pb-2">
+      <h2 class="text-sm font-bold uppercase tracking-wider text-gray-300">Decision Log</h2>
+    </div>
+    <div class="space-y-2 overflow-y-auto max-h-48" id="decisions-list">
+      <div class="text-center text-gray-600 text-xs py-8">No decisions yet</div>
+    </div>
+  </section>
+
+  <!-- KANBAN FLEET -->
+  <section class="lg:col-span-4 card flex flex-col gap-4">
+    <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+      <h2 class="text-sm font-bold uppercase tracking-wider text-gray-300">Kanban Fleet</h2>
+      <span class="text-xs text-gray-500 mono" id="kanban-count">0 cards</span>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3" id="kanban-board"></div>
+  </section>
+
+  <!-- DISPATCH TERMINAL -->
+  <section class="lg:col-span-4 card">
+    <!-- Header: Mode + Project dropdowns -->
+    <div class="border-b border-gray-800 pb-2 mb-4 flex flex-col gap-2">
+      <div class="flex justify-between items-center">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-gray-300">Dispatch Terminal</h2>
+        <span id="active-workspace" class="text-xs text-emerald-500 mono truncate max-w-[200px]"></span>
+      </div>
+      <div class="flex gap-2 items-center">
+        <!-- Mode selector (dropdown) -->
+        <select id="mode-select" onchange="onModeChange()" 
+                class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-indigo-500"
+                title="Select chat mode">
+          <option value="standard">&#9874; Standard</option>
+          <option value="grill">&#128293; Grill Me</option>
+          <option value="thinking">&#129504; Thinking</option>
+          <option value="spike">&#9889; Spike</option>
+          <option value="plan">&#128221; Plan</option>
+          <option value="tdd">&#9989; TDD</option>
+          <option value="council">&#127963; Council</option>
+          <option value="debug">&#128030; Debug</option>
+          <option value="boss">&#128274; Boss Review</option>
+          <option value="codex">&#128187; Code</option>
+        </select>
+        <span id="mode-desc" class="text-xs text-gray-500 flex-1 truncate">Tier-0..3 NL routing with cost gates</span>
+        
+        <!-- Project selector (dropdown) -->
+        <select id="project-select" onchange="onProjectChange()" 
+                class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-emerald-500 min-w-[140px]"
+                title="Select active project">
+          <option value="">&#128230; No Project</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Chat history (project sessions) -->
+    <div id="chat-history" class="mb-3 max-h-[200px] overflow-y-auto space-y-1 text-xs hidden"></div>
+
+    <!-- Input row -->
+    <div class="flex gap-2 items-end">
+      <input id="nl-input" type="text" placeholder='e.g. "show me agents" or "deploy to production"'
+             class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500">
+      <button onclick="sendChat()" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm font-semibold">Send</button>
+      <button id="mic-btn" onclick="Voice.toggle()" title="Voice input (hold to speak)" 
+              class="px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-lg">&#x1F3A4;</button>
+    </div>
+
+    <!-- Response area -->
+    <div id="chat-response" class="mt-3 text-sm text-gray-300 hidden p-3 bg-gray-900 rounded-lg border border-gray-700 relative">
+      <div class="flex items-center gap-2 mb-2">
+        <span id="resp-mode-badge" class="text-xs font-bold px-2 py-0.5 rounded bg-indigo-700 text-white"></span>
+        <span id="resp-tier-badge" class="text-xs text-gray-400"></span>
+        <span id="resp-cost" class="text-xs text-amber-400 ml-auto"></span>
+      </div>
+      <div id="resp-text" class="whitespace-pre-wrap"></div>
+      <div id="resp-actions" class="mt-3 flex gap-2 hidden">
+        <button onclick="confirmExec()" class="px-3 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-xs font-semibold">&#10003; Execute</button>
+        <button onclick="cancelExec()" class="px-3 py-1 rounded bg-red-700 hover:bg-red-600 text-xs font-semibold">&#10007; Cancel</button>
+      </div>
+    </div>
+
+    <div class="mt-6">
+      <div class="text-xs text-gray-500 mb-1 mono">Real-time Cost Ribbon</div>
+      <div class="ekg" id="ekg-panel">
+        <svg width="100%" height="60" id="ekg-svg"></svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- DISCORD NEXUS -->
+  <section class="card flex flex-col gap-4">
+    <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+      <h2 class="text-sm font-bold uppercase tracking-wider text-gray-300">Discord Nexus</h2>
+      <span class="text-xs text-gray-500 mono" id="discord-count">0 threads</span>
+    </div>
+    <div id="discord-panel" class="space-y-2 text-sm text-gray-400">
+      <div class="text-center py-4 text-gray-600">No threads yet.</div>
+    </div>
+  </section>
+
+  <!-- COUNCIL CHAMBER -->
+  <section class="card flex flex-col gap-4">
+    <div class="border-b border-gray-800 pb-2">
+      <h2 class="text-sm font-bold uppercase tracking-wider text-gray-300">Council Chamber</h2>
+    </div>
+    <div id="council-panel" class="flex flex-col gap-2">
+      <div class="text-center text-gray-600 text-xs py-4">Council awaits the first motion.</div>
+    </div>
+  </section>
+
+  <!-- WORKSPACE BINDING -->
+  <section class="card flex flex-col gap-4">
+    <div class="flex justify-between items-center border-b border-gray-800 pb-2">
+      <h2 class="text-sm font-bold uppercase tracking-wider text-gray-300">GitHub Workspace</h2>
+      <span class="text-xs text-gray-500 mono" id="workspace-count">0 repos</span>
+    </div>
+    <div class="flex gap-2">
+      <input id="ws-url" type="text" placeholder="https://github.com/user/repo.git" 
+             class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+      <input id="ws-name" type="text" placeholder="alias" 
+             class="w-24 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white">
+      <button onclick="cloneWorkspace()" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-2 rounded-lg text-xs font-semibold">Clone</button>
+    </div>
+    <div id="workspace-list" class="space-y-2 text-sm text-gray-400 max-h-48 overflow-y-auto">
+      <div class="text-center py-4 text-gray-600">No workspaces bound.</div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Session Drawer -->
+<div id="session-drawer">
+  <div class="flex justify-between items-center p-4 border-b border-gray-800">
+    <h3 class="text-sm font-bold text-gray-300">Conversations</h3>
+    <input id="session-search" type="text" placeholder="Search sessions..." class="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-white">
+    <button onclick="toggleDrawer('main')" class="tab-btn">CLOSE</button>
+  </div>
+  <div class="p-4 overflow-y-auto h-full">
+    <div id="session-list" class="space-y-2"></div>
+  </div>
+</div>
+
+<!-- Audit Strip -->
+<div id="audit-strip" class="audit-strip">
+  <div id="audit-stream" class="flex items-center"></div>
+</div>
+
+<!-- Scripts -->
+<script src="js/websocket-client.js"></script>
+<script src="js/theater.js"></script>
+<script src="js/dna-helix.js"></script>
+<script src="js/three-constellation.js"></script>
+
+<script>
+const API = "http://43.131.26.109:8502/api/plugins/jarvis-dashboard/v1";
+const TOKEN="dev"
+const WS_URL = "ws://43.131.26.109:8502/api/plugins/jarvis-dashboard/v1/ws?token=dev";
+
+function q(u){ return fetch(API+u+"?token="+TOKEN).then(r=>r.json()); }
+function escapeHtml(s){ return (s==null?"":String(s)).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+// ─── EKG ──────────────────────────────────────────
+let ekgPoints=[]; for(let x=0;x<400;x++) ekgPoints.push(30);
+function drawEkg(){
+  const svg=document.getElementById("ekg-svg");
+  if(!svg) return;
+  ekgPoints.shift();
+  let beat=Math.random()*15+parseFloat(document.getElementById("metric-cost").textContent.split("$")[1]||0)*50;
+  ekgPoints.push(30+Math.sin(Date.now()/200)*beat);
+  let d="M0 30 ";
+  for(let i=0;i<ekgPoints.length;i++) d+=(i?"L":"")+(i*2)+" "+ekgPoints[i]+" ";
+  const cost = parseFloat(document.getElementById("metric-cost").textContent.split("$")[1]||0);
+  let color = cost > 10 ? '#ef4444' : cost > 5 ? '#f59e0b' : '#22c55e';
+  const path = document.createElementNS("http://www.w3.org/2000/svg","path");
+  path.setAttribute("d", d); path.setAttribute("class","ekg-line");
+  path.style.stroke = color;
+  svg.innerHTML = ''; svg.appendChild(path);
+}
+setInterval(drawEkg,80);
+
+// ─── DNA HELIX ────────────────────────────────────
+let dnaController = null;
+if(typeof initDNAHelix === 'function'){
+  dnaController = initDNAHelix('dna-helix');
+}
+
+// ─── AGENTS ───────────────────────────────────────
+function updateAgents(data){
+  const list=document.getElementById("agent-list");
+  list.innerHTML="";
+  (data||[]).forEach(a=>{
+    const el=document.createElement("div");
+    el.className="flex flex-col items-center gap-1 min-w-[80px]";
+    const abbr = a.name.replace("jarvis-","").slice(0,2).toUpperCase();
+    el.innerHTML=`
+      <div class="orb" style="color:${a.color};background:${a.color}22">${abbr}</div>
+      <span class="text-[10px] text-gray-400">${escapeHtml(a.name)}</span>
+      <span class="text-[9px] text-gray-500">${a.alive?"ONLINE":"OFFLINE"}</span>`;
+    list.appendChild(el);
+  });
+  document.getElementById("agent-count").textContent=(data||[]).length+" alive";
+  // Init Three.js constellation
+  if(typeof init3D === 'function'){
+    init3D('constellation');
+    if(typeof update3D === 'function') update3D(data||[]);
+  }
+}
+
+// ─── KANBAN ───────────────────────────────────────
+function updateKanban(cards){
+  const board=document.getElementById("kanban-board");
+  board.innerHTML="";
+  const cols={todo:[],ready:[],running:[], done:[]};
+  (cards||[]).forEach(c=>{
+    let s=c.status;
+    if(!cols[s]) s="todo";
+    cols[s].push(c);
+  });
+  for(const col of ["todo","ready","running", "done"]){
+    const div=document.createElement("div");
+    div.className="kanban-col";
+    div.innerHTML=`<div class="text-xs font-bold text-gray-500 uppercase mb-2">${col} <span class="float-right">${cols[col].length}</span></div>`;
+    cols[col].sort((a,b)=>(b.priority||0)-(a.priority||0));
+    cols[col].forEach(c=>{
+      const card=document.createElement("div");
+      card.className="kanban-card border-l-2";
+      card.style.borderLeftColor=c.color||"#6b7280";
+      card.innerHTML=`<div class="font-semibold text-gray-200">${escapeHtml(c.title||"")}</div>
+        <div class="flex justify-between text-[10px] text-gray-400 mt-1">
+          <span>${escapeHtml(c.assignee||"")}</span><span>${escapeHtml(c.status)}</span>
+        </div>`;
+      div.appendChild(card);
+    });
+    board.appendChild(div);
+  }
+  document.getElementById("kanban-count").textContent=(cards||[]).length+" cards";
+}
+
+// ─── MEMORY ────────────────────────────────────────
+function updateMemory(m){
+  document.getElementById("mem-pending").textContent=m.pending||0;
+  document.getElementById("mem-approved").textContent=m.approved||0;
+  document.getElementById("mem-contra").textContent=m.contradictions||0;
+  if(dnaController) dnaController.updateColors(m.pending||0, m.approved||0, m.contradictions||0);
+}
+
+// ─── METRICS ───────────────────────────────────────
+function updateMetrics(m){
+  document.getElementById("metric-tokens").textContent="Tokens: "+(m.tokens_today||0).toLocaleString();
+  document.getElementById("metric-cost").textContent="Cost: $"+(m.cost_today||0).toFixed(2);
+  document.getElementById("metric-budget").textContent="Budget: $"+(m.budget_remaining||50).toFixed(2);
+}
+
+// ─── DECISIONS ──────────────────────────────────────
+function updateDecisions(d){
+  const list=document.getElementById("decisions-list");
+  list.innerHTML="";
+  if(!(d||[]).length){list.innerHTML='<div class="text-center text-gray-600 text-xs py-8">No decisions yet</div>';return;}
+  (d||[]).slice(0,10).forEach(dec=>{
+    const el=document.createElement("div");
+    el.className="bg-gray-900 rounded p-2 text-xs border border-gray-800";
+    const tier = dec.tier||0;
+    el.innerHTML=`<span class="tier-badge tier-${tier}">Tier ${tier}</span> <span class="text-gray-300 ml-1">${escapeHtml((dec.title||dec.decision_id||"").slice(0,60))}</span>
+      <div class="text-gray-500 mt-1">${new Date(dec.timestamp).toLocaleString()}</div>`;
+    list.appendChild(el);
+  });
+}
+
+// ─── AUDIT STRIP ──────────────────────────────────
+function pollAudit(){
+  q("/audit?limit=10").then(data=>{
+    const stream=document.getElementById("audit-stream");
+    if(!stream) return;
+    if(!data.records || !data.records.length){stream.innerHTML='<span class="text-gray-600">No audit events</span>'; return;}
+    stream.innerHTML = data.records.slice(0,8).map(r=>{
+      const cls = (r.severity==='error'?'audit-error':r.severity==='warn'?'audit-warn':'audit-info');
+      return `<span class="audit-row ${cls}">${r.ts||''} [${r.category||'system'}] ${r.action||''}</span>`;
+    }).join('');
+  }).catch(()=>{});
+}
+
+// ─── SESSIONS ──────────────────────────────────────
+function loadSessions(){
+  q("/sessions?limit=20").then(data=>{
+    const list=document.getElementById("session-list");
+    if(!list) return;
+    const sessions = data.sessions || [];
+    if(!sessions.length){list.innerHTML='<div class="text-center text-gray-600 text-xs py-8">No sessions found</div>'; return;}
+    list.innerHTML = sessions.map(s=>`<div class="bg-gray-900 rounded p-2 text-xs border border-gray-800 cursor-pointer hover:bg-gray-800">
+      <div class="font-semibold text-gray-200">${escapeHtml(s.title||s.session_id||"Untitled")}</div>
+      <div class="text-gray-500">${s.when||""} · ${s.message_count||0} msgs · ${s.source}</div>
+    </div>`).join('');
+  }).catch(()=>{});
+}
+
+// ─── DISCORD ──────────────────────────────────────
+function updateDiscord(threads){
+  const panel=document.getElementById("discord-panel");
+  const count=document.getElementById("discord-count");
+  if(!panel) return;
+  if(!(threads||[]).length){panel.innerHTML='<div class="text-center py-4 text-gray-600">No threads yet.</div>'; if(count) count.textContent="0 threads"; return;}
+  if(count) count.textContent=(threads||[]).length+" threads";
+  panel.innerHTML = (threads||[]).slice(0,5).map(t=>`<div class="bg-gray-900 rounded p-2 text-xs border border-gray-800">
+    <div class="font-semibold text-gray-200">${escapeHtml(t.thread_name||"Unnamed")}</div>
+    <div class="text-gray-500">${(t.participant_bots||[]).join(', ')}</div>
+  </div>`).join('');
+}
+
+// ─── PROJECT-AWARE CHAT DISPATCH ────────────────────
+let MODES = [];
+let ACTIVE_MODE = "standard";
+let ACTIVE_PROJECT = "";      // slug, not name
+let ACTIVE_PROJECT_NAME = "";
+let PENDING_EXEC = null;
+
+const MODE_DESC = {
+  standard: "Tier-0..3 NL routing with cost gates",
+  grill: "Founder asks 3 hard questions before you build",
+  thinking: "Deep reasoning — no execution, just analysis",
+  spike: "30-min throwaway experiment",
+  plan: "Writes markdown plan only — no code",
+  tdd: "RED → GREEN → REFACTOR — tests before code",
+  council: "Boss+Manager+Scout parallel review",
+  debug: "4-phase systematic debugging",
+  boss: "Claude architecture + security gate",
+  codex: "Codex CLI direct implementation"
+};
+
+async function loadModes(){
+  try{
+    const r=await fetch(`${API}/modes?token=${TOKEN}`);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    MODES = d.modes || [];
+    ACTIVE_MODE = d.default || "standard";
+    const sel = document.getElementById('mode-select');
+    if(sel){
+      sel.value = ACTIVE_MODE;
+      onModeChange();
+    }
+  }catch(e){ console.error('Mode load failed:', e.message); }
+}
+
+function onModeChange(){
+  ACTIVE_MODE = document.getElementById('mode-select').value || 'standard';
+  const desc = document.getElementById('mode-desc');
+  if(desc) desc.textContent = MODE_DESC[ACTIVE_MODE] || '';
+  const inp = document.getElementById('nl-input');
+  const m = MODES.find(x=>x.id===ACTIVE_MODE);
+  if(inp && m){
+    inp.placeholder = `[${m.name}] ${m.exec ? 'Can execute — type your message' : 'No execution — type your message'}`;
+  }
+}
+
+async function loadProjects(){
+  try{
+    const r = await fetch(`${API}/project/list?token=${TOKEN}`);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    const projects = d.projects || [];
+    const active = d.active;
+    const sel = document.getElementById('project-select');
+    if(!sel) return;
+    // Rebuild options
+    sel.innerHTML = '<option value="">📦 No Project</option>';
+    projects.forEach(p=>{
+      const opt = document.createElement('option');
+      opt.value = p.slug;
+      opt.textContent = `${p.name} ${p.status === 'active' ? '(✓)' : ''}`;
+      if(active && p.slug === active.slug) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    // Set active state
+    if(active){
+      ACTIVE_PROJECT = active.slug;
+      ACTIVE_PROJECT_NAME = active.name;
+      updateWorkspaceIndicator(active.repo_path || '');
+      loadProjectSessions(active.slug);
+    } else {
+      ACTIVE_PROJECT = '';
+      ACTIVE_PROJECT_NAME = '';
+      updateWorkspaceIndicator('');
+      document.getElementById('chat-history').classList.add('hidden');
+    }
+  }catch(e){ console.error('Project load failed:', e.message); }
+}
+
+function updateWorkspaceIndicator(path){
+  const el = document.getElementById('active-workspace');
+  if(!el) return;
+  if(path){
+    const short = path.split('/').slice(-2).join('/');
+    el.textContent = `📁 ${short}`;
+  } else {
+    el.textContent = '';
+  }
+}
+
+async function onProjectChange(){
+  const slug = document.getElementById('project-select').value;
+  if(!slug){
+    ACTIVE_PROJECT = '';
+    ACTIVE_PROJECT_NAME = '';
+    updateWorkspaceIndicator('');
+    document.getElementById('chat-history').classList.add('hidden');
+    return;
+  }
+  // Switch active project on backend
+  try{
+    const r = await fetch(`${API}/project/select?token=${TOKEN}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({slug})
+    });
+    const d = await r.json();
+    ACTIVE_PROJECT = d.active?.slug || slug;
+    ACTIVE_PROJECT_NAME = d.active?.name || slug;
+    updateWorkspaceIndicator(d.active?.repo_path || '');
+    loadProjectSessions(slug);
+  }catch(e){ console.error('Project switch failed:', e.message); }
+}
+
+async function loadProjectSessions(slug){
+  const box = document.getElementById('chat-history');
+  if(!box) return;
+  if(!slug){ box.classList.add('hidden'); return; }
+  try{
+    const r = await fetch(`${API}/project/${encodeURIComponent(slug)}/sessions?limit=20&token=${TOKEN}`);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d = await r.json();
+    const sessions = d.sessions || [];
+    if(!sessions.length){ box.classList.add('hidden'); return; }
+    box.innerHTML = sessions.map(s=>{
+      const role = s.role;
+      const content = escapeHtml(s.content.slice(0,120) + (s.content.length>120?'...':''));
+      const color = role==='user'?'text-indigo-300':role==='assistant'?'text-gray-300':'text-gray-500';
+      const badge = role==='user'?'U':'AI';
+      return `<div class="${color}"><span class="text-[10px] bg-gray-800 px-1 rounded mr-1">${badge}</span>${content}</div>`;
+    }).join('');
+    box.classList.remove('hidden');
+    box.scrollTop = box.scrollHeight;
+  }catch(e){ console.error('Session load failed:', e.message); box.classList.add('hidden'); }
+}
+
+async function sendChat(){
+  const input = document.getElementById("nl-input");
+  const respBox = document.getElementById("chat-response");
+  const respText = document.getElementById("resp-text");
+  const respMode = document.getElementById("resp-mode-badge");
+  const respTier = document.getElementById("resp-tier-badge");
+  const respCost = document.getElementById("resp-cost");
+  const respActions = document.getElementById("resp-actions");
+  const msg = input.value.trim();
+  if(!msg) return;
+
+  // Add user message to project history immediately
+  if(ACTIVE_PROJECT){
+    const box = document.getElementById('chat-history');
+    const line = document.createElement('div');
+    line.className = 'text-indigo-300';
+    line.innerHTML = `<span class="text-[10px] bg-gray-800 px-1 rounded mr-1">U</span>${escapeHtml(msg.slice(0,120))}`;
+    box.appendChild(line);
+    box.classList.remove('hidden');
+    box.scrollTop = box.scrollHeight;
+  }
+
+  respBox.classList.remove("hidden");
+  respText.textContent = "Dispatching...";
+  respMode.textContent = ACTIVE_MODE.toUpperCase();
+  respTier.textContent = "";
+  respCost.textContent = "";
+  respActions.classList.add("hidden");
+  PENDING_EXEC = null;
+
+  try{
+    const payload = JSON.stringify({
+      message: msg,
+      mode: ACTIVE_MODE,
+      project: ACTIVE_PROJECT,
+      project_name: ACTIVE_PROJECT_NAME
+    });
+    const r = await fetch(`${API}/chat?token=${TOKEN}`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: payload
+    });
+    if(!r.ok){
+      const err = await r.json();
+      throw new Error(err.detail || r.statusText);
+    }
+    const data = await r.json();
+
+    respMode.textContent = (data.mode || ACTIVE_MODE).toUpperCase();
+    respTier.textContent = `Tier ${data.tier !== undefined ? data.tier : '-'}`;
+    respCost.textContent = data.cost !== undefined ? `$${data.cost.toFixed(2)}` : '';
+    respText.textContent = data.response || "(no response)";
+
+    if(data.confirmation_required && data.can_exec){
+      respActions.classList.remove("hidden");
+      PENDING_EXEC = {mode: data.mode, msg: msg, tier: data.tier};
+    }
+    if(typeof Voice !== 'undefined' && Voice.speak){
+      Voice.speak(data.response ? data.response.slice(0, 300) : "Response received");
+    }
+    // Refresh sessions to include assistant response
+    if(ACTIVE_PROJECT) loadProjectSessions(ACTIVE_PROJECT);
+  }catch(e){
+    respText.textContent = "Error: " + e.message;
+    respMode.textContent = "ERROR";
+    respMode.className = "text-xs font-bold px-2 py-0.5 rounded bg-red-700 text-white";
+  }
+}
+
+function confirmExec(){
+  if(!PENDING_EXEC) return;
+  const msg = `[EXECUTING] ${PENDING_EXEC.mode} — "${PENDING_EXEC.msg.slice(0, 40)}"`;
+  document.getElementById('resp-text').textContent = msg + "\n\n[Execution dispatched to agent fleet — check kanban for task status]";
+  document.getElementById('resp-actions').classList.add('hidden');
+  PENDING_EXEC = null;
+}
+
+function cancelExec(){
+  document.getElementById('resp-text').textContent += "\n\n[Cancelled by user]";
+  document.getElementById('resp-actions').classList.add('hidden');
+  PENDING_EXEC = null;
+}
+
+// ─── DEPRECATED: old sendNL, map to new system ─────
+async function sendNL(){ sendChat(); }
+
+document.getElementById("nl-input")?.addEventListener("keydown",e=>{if(e.key==="Enter")sendChat();});
+
+// ─── WORKSPACE (repo clone) panel ───────────────────
+async function loadWorkspaces(){
+  try{
+    const r=await fetch(`${API}/workspace/list?token=${TOKEN}`);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    const list = document.getElementById('workspace-list');
+    const count = document.getElementById('workspace-count');
+    if(!list) return;
+    const ws = d.workspaces || [];
+    if(count) count.textContent = ws.length + " repo" + (ws.length===1?"":"s");
+    if(!ws.length){ list.innerHTML = '<div class="text-center text-gray-600 text-xs py-4">No workspaces. Paste a GitHub URL to clone.</div>'; return; }
+    list.innerHTML = ws.map(w=>`
+      <div class="bg-gray-900 rounded p-2 text-xs border border-gray-800 flex justify-between items-center" data-name="${escapeHtml(w.name)}">
+        <div>
+          <div class="font-semibold text-gray-200">${escapeHtml(w.name)}</div>
+          <div class="text-gray-500">${w.branch||'unknown'} · ${w.size_mb}MB ${w.has_git?'· git':''}</div>
+        </div>
+        <button onclick="removeWorkspace('${escapeHtml(w.name)}')" class="text-red-500 hover:text-red-400 px-1">×</button>
+      </div>
+    `).join('');
+  }catch(e){ console.error('Workspace load failed:', e.message); }
+}
+
+async function cloneWorkspace(){
+  const url = document.getElementById('ws-url')?.value?.trim();
+  if(!url) return;
+  try{
+    const r = await fetch(`${API}/project/clone?token=${TOKEN}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url, alias: ''})
+    });
+    if(!r.ok){ const err = await r.json(); throw new Error(err.detail || 'Clone failed'); }
+    const d = await r.json();
+    alert(d.message || 'Cloned!');
+    loadProjects();  // refresh project dropdown with new vault
+    loadWorkspaces();
+    // Auto-select the new project
+    if(d.slug){
+      document.getElementById('project-select').value = d.slug;
+      onProjectChange();
+    }
+  }catch(e){ alert('Clone error: ' + e.message); }
+}
+
+async function removeWorkspace(name){
+  if(!confirm('Delete workspace + vault for ' + name + '?')) return;
+  try{
+    await fetch(`${API}/workspace/remove?token=${TOKEN}`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name})
+    });
+    loadProjects(); loadWorkspaces();
+  }catch(e){ alert('Remove error: ' + e.message); }
+}
+
+// ─── DRAWER TOGGLE ─────────────────────────────────
+function toggleDrawer(tab){
+  const drawer=document.getElementById("session-drawer");
+  const btns=['btn-main','btn-sessions','btn-discord'];
+  btns.forEach(b=>{const el=document.getElementById(b); if(el) el.classList.remove('active');});
+  if(tab==='main'){
+    drawer.classList.remove('open');
+    document.getElementById('btn-main')?.classList.add('active');
+  } else if(tab==='sessions'){
+    drawer.classList.add('open');
+    document.getElementById('btn-sessions')?.classList.add('active');
+    loadSessions();
+  } else if(tab==='discord'){
+    drawer.classList.add('open');
+    document.getElementById('btn-discord')?.classList.add('active');
+    q("/discord/threads?limit=20").then(d=>{updateDiscord(d.threads||[]);}).catch(()=>{});
+  }
+}
+
+// ─── WEBSOCKET ─────────────────────────────────────
+const ws = new WsClient(WS_URL);
+ws.on('snapshot', msg=>{
+  const d = msg.payload || msg;
+  if(d.agents !== undefined) updateAgents(d.agents||[]);
+  if(d.kanban_by_project !== undefined) updateKanban(Object.values(d.kanban_by_project||{}).flat());
+  if(d.memory !== undefined) updateMemory(d.memory||{});
+  if(d.metrics !== undefined) updateMetrics(d.metrics||{});
+  if(d.decisions !== undefined) updateDecisions(d.decisions||[]);
+});
+ws.on('all', msg=>{
+  if(msg.type==='snapshot'){
+    const d = msg.payload || msg;
+    if(d.agents !== undefined) updateAgents(d.agents||[]);
+    if(d.kanban_by_project !== undefined) updateKanban(Object.values(d.kanban_by_project||{}).flat());
+    if(d.memory !== undefined) updateMemory(d.memory||{});
+    if(d.metrics !== undefined) updateMetrics(d.metrics||{});
+    if(d.decisions !== undefined) updateDecisions(d.decisions||[]);
+  }
+});
+ws.open();
+ws.subscribe('agents'); ws.subscribe('kanban'); ws.subscribe('memory'); ws.subscribe('metrics'); ws.subscribe('discord');
+
+// ─── POLL LOOP (fallback + initial fill) ────────────
+async function poll(){
+  try{
+    const cache=await q("/dashboard/cache");
+    if(!cache.error){
+      updateAgents(cache.agents||[]);
+      updateKanban(Object.values(cache.kanban_by_project||{}).flat());
+      updateMemory(cache.memory||{});
+      updateMetrics(cache.metrics||{});
+      updateDecisions(cache.decisions||[]);
+    }
+    document.getElementById("conn-dot").className="w-2 h-2 rounded-full bg-green-500 animate-pulse";
+  }catch(err){
+    document.getElementById("conn-dot").className="w-2 h-2 rounded-full bg-red-500 animate-pulse";
+    console.error(err);
+  }
+}
+poll();
+pollAudit();
+setInterval(poll,5000);
+setInterval(pollAudit, 5000);
+
+// ─── MODE + PROJECT INIT ────────────────────────────
+loadModes();
+loadProjects();
+loadWorkspaces();
+setInterval(loadWorkspaces, 15000);
+
+// ─── INACTIVITY PING (keeps static server alive) ─────
+setInterval(()=>{
+  fetch("/inactivity-ping", {cache: "no-store"}).catch(()=>{});
+}, 20000); // ping every 20 seconds
+
+// ─── CONNECTION INDICATOR ──────────────────────────
+setInterval(()=>{
+  const dot = document.getElementById('conn-dot');
+  const txt = document.getElementById('conn-text');
+  if(ws.connected){ dot.className="w-2 h-2 rounded-full bg-green-500 animate-pulse"; txt.textContent="WS"; }
+  else if(ws.pollInterval){ dot.className="w-2 h-2 rounded-full bg-yellow-500"; txt.textContent="POLL"; }
+  else { dot.className="w-2 h-2 rounded-full bg-red-500"; txt.textContent="OFF"; }
+}, 3000);
+
+// ─── KEYBOARD SHORTCUTS ──────────────────────────
+document.addEventListener('keydown', e=>{
+  if(e.key === 'Escape') toggleDrawer('main');
+  if(e.ctrlKey && e.key === 'k'){ e.preventDefault(); document.getElementById('session-search')?.focus(); }
+});
+
+// ─── VOICE I/O ─────────────────────────────────────
+const Voice = {
+  rec: null,
+  synth: window.speechSynthesis,
+  listening: false,
+  queue: [],
+  init(){
+    if(!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)){
+      console.warn('SpeechRecognition not supported'); return;
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    this.rec = new SR();
+    this.rec.continuous = false;
+    this.rec.interimResults = true;
+    this.rec.lang = 'en-US';
+    this.rec.onstart = ()=>{ this.listening=true; this.updateMicUI(); };
+    this.rec.onend = ()=>{ this.listening=false; this.updateMicUI(); };
+    this.rec.onresult = (e)=>{
+      const last = e.results[e.results.length-1];
+      if(last.isFinal){
+        const text = last[0].transcript.trim();
+        if(text) this.sendToAgent(text);
+      }
+    };
+    this.rec.onerror = (e)=>{ console.error('Speech error',e.error); this.listening=false; this.updateMicUI(); };
+  },
+  toggle(){
+    const self = Voice; // avoid HTML onclick binding `this` to button element
+    if(!self.rec){ alert('Voice not supported in this browser'); return; }
+    if(self.listening){ self.rec.stop(); }
+    else{ self.rec.start(); }
+  },
+  updateMicUI(){
+    const btn = document.getElementById('mic-btn');
+    if(!btn) return;
+    if(this.listening){
+      btn.innerHTML = '<span class="animate-pulse">&#x1F3A4;</span>';
+      btn.className = 'ml-2 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-bold shadow-lg shadow-red-500/30';
+    } else {
+      btn.innerHTML = '&#x1F3A4;';
+      btn.className = 'ml-2 px-3 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300';
+    }
+  },
+  async sendToAgent(text){
+    document.getElementById('cmd-input').value = text;
+    document.getElementById('cmd-send').click();
+  },
+  speak(text){
+    if(!this.synth || !text) return;
+    // Cancel previous speech
+    this.synth.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.1; u.pitch = 0.9; u.volume = 1.0;
+    // Try to find a male-ish voice
+    const voices = this.synth.getVoices();
+    const en = voices.find(v=>v.lang.startsWith('en') && (v.name.includes('Male')||v.name.includes('David')||v.name.includes('Google US English')));
+    if(en) u.voice = en;
+    this.synth.speak(u);
+  }
+};
+Voice.init();
+
+// Auto-speak agent responses when chat panel has new messages
+const _origUpdateChat = updateChat || function(){};
+updateChat = function(history){
+  const prevLen = window._lastChatLen || 0;
+  window._lastChatLen = (history||[]).length;
+  if((history||[]).length > prevLen){
+    const lastMsg = history[history.length-1];
+    if(lastMsg && lastMsg.role==='assistant' && lastMsg.content){
+      Voice.speak(lastMsg.content.slice(0, 300)); // max 300 chars
+    }
+  }
+  if(typeof _origUpdateChat === 'function') _origUpdateChat(history);
+};
+
+// ─── WORKSPACE MANAGER ─────────────────────────────
+async function loadWorkspaces(){
+  try{
+    const r=await fetch(`${API}/workspace/list?token=${TOKEN}`);
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const d=await r.json();
+    updateWorkspaces(d.workspaces||[]);
+  }catch(e){ console.error('Workspace load failed:', e.message); }
+}
+
+function updateWorkspaces(list){
+  const el=document.getElementById('workspace-list');
+  const cnt=document.getElementById('workspace-count');
+  if(!el) return;
+  cnt.textContent = `${list.length} repos`;
+  if(!list.length){ el.innerHTML='<div class="text-center py-4 text-gray-600">No workspaces bound.</div>'; return; }
+  el.innerHTML = list.map(w=>{
+    const git = w.has_git ? '<span class="text-emerald-500 text-xs">● git</span>' : '';
+    return `<div class="bg-gray-900 rounded-lg p-3 border border-gray-700 hover:border-gray-500 transition-colors">
+      <div class="flex justify-between items-start">
+        <div class="font-semibold text-gray-200 text-xs">${escapeHtml(w.name)}</div>
+        <button onclick="removeWorkspace('${escapeHtml(w.name)}')" class="text-red-500 hover:text-red-400 text-xs">&#x2715;</button>
+      </div>
+      <div class="text-gray-500 text-xs mt-1">${escapeHtml(w.origin||'no remote')} ${git}</div>
+      <div class="text-gray-600 text-xs mt-1">${w.size_mb}MB · ${w.branch}</div>
+    </div>`;
+  }).join('');
+}
+
+async function cloneWorkspace(){
+  const url=document.getElementById('ws-url').value.trim();
+  const name=document.getElementById('ws-name').value.trim()||null;
+  if(!url){ alert('Enter a GitHub repo URL'); return; }
+  try{
+    const r=await fetch(`${API}/workspace/clone?token=${TOKEN}`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({repo_url:url, name:name})
+    });
+    if(!r.ok){ const e=await r.json(); throw new Error(e.detail||r.statusText); }
+    const d=await r.json();
+    document.getElementById('ws-url').value='';
+    document.getElementById('ws-name').value='';
+    loadWorkspaces();
+    alert(`Cloned ${d.name}`);
+  }catch(e){ alert('Clone failed: '+e.message); console.error(e); }
+}
+
+async function removeWorkspace(name){
+  if(!confirm(`Remove workspace "${name}"?`)) return;
+  try{
+    const r=await fetch(`${API}/workspace/remove?token=${TOKEN}`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:name})
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    loadWorkspaces();
+  }catch(e){ alert('Remove failed: '+e.message); }
+}
+
+// Initial load
+loadWorkspaces();
+setInterval(loadWorkspaces, 15000);
+
+// xp bar init
+Theater.renderBar();
+</script>
+</body>
+</html>

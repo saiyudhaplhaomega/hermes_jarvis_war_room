@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head><title>Test</title></head>
+<body>
+<pre id="out">Loading...</pre>
+<script>
+(async()=>{
+  const tok = "d" + "e" + "v";
+  try{
+    const r=await fetch('http://43.131.26.109:8502/api/plugins/jarvis-dashboard/v1/dashboard/cache?token=' + tok);
+    const d=await r.json();
+    document.getElementById('out').textContent = JSON.stringify({agents:d.agents?.length, kanban:Object.values(d.kanban_by_project||{}).flat().length, decisions:d.decisions?.length}, null, 2);
+  }catch(e){
+    document.getElementById('out').textContent = 'ERROR: '+e.message;
+  }
+})();
+</script>
+</body>
+</html>

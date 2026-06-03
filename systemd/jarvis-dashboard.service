@@ -1,0 +1,20 @@
+[Unit]
+Description=Jarvis War Room Dashboard Backend (FastAPI)
+After=network.target
+
+[Service]
+EnvironmentFile=/home/ubuntu/.hermes/profiles/jarvis/plugins/jarvis-dashboard/state/dashboard.env
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/.hermes/profiles/jarvis/plugins/jarvis-dashboard
+Environment=PYTHONPATH=/home/ubuntu/.hermes/profiles/jarvis/plugins/jarvis-dashboard
+Environment=PATH=/home/ubuntu/.hermes/profiles/jarvis/plugins/jarvis-dashboard/venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/ubuntu/.hermes/profiles/jarvis/plugins/jarvis-dashboard/venv/bin/uvicorn backend.server:app --host 127.0.0.1 --port 8502 --log-level info --no-access-log
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

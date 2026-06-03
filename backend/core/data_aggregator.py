@@ -1,0 +1,343 @@
+"""
+Dashboard Data Aggregator.
+Scans filesystem + SQLite sources into a single cache.json snapshot.
+Runs every AGGREGATE_INTERVAL seconds.
+"""
+from __future__ import annotations
+import json, os, re, sqlite3, yaml, glob, hashlib, subprocess
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from .config import *  # noqa
+
+
+class DataAggregator:
+    def __init__(self):
+        self.cache = {}
+        DASHBOARD_DATA.mkdir(parents=True, exist_ok=True)
+
+    def run(self) -> dict[str, Any]:
+        self.cache = {
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "agents": self._scan_agents(),
+            "tasks": self._scan_tasks(),
+            "kanban_by_project": self._scan_kanban(),
+            "decisions": self._scan_decisions(),
+            "memory": self._scan_memory(),
+            "metrics": self._scan_metrics(),
+            "gateway": self._scan_gateway(),
+            "projects": self._scan_projects(),
+            "sessions": self._scan_sessions(),
+        }
+        self.write_cache()
+        return self.cache
+
+    # ───────────────────────────────────────────────
+    def _scan_agents(self):
+        agents = []
+        profiles_root = PROFILE
+        if not profiles_root.exists():
+            return agents
+        try:
+            ps_out = subprocess.check_output(["ps", "-ef"], text=True, timeout=2)
+        except Exception:
+            ps_out = ""
+        for profile_dir in sorted(profiles_root.glob("jarvis*")):
+            if not profile_dir.is_dir():
+                continue
+            p = profile_dir / "config.yaml"
+            if not p.exists():
+                continue
+            try:
+                data = yaml.safe_load(p.read_text())
+            except Exception:
+                continue
+            if not isinstance(data, dict):
+                continue
+            profile = data.get("profile") or {}
+            model_cfg = data.get("model") or {}
+            name = profile.get("name") or profile_dir.name
+            model = model_cfg.get("default") or model_cfg.get("model") or ""
+            provider = model_cfg.get("provider") or ""
+            running = (f"--profile {name} gateway" in ps_out) or (name == "jarvis" and "hermes_cli.main gateway run" in ps_out)
+            agents.append({
+                "name": name,
+                "tier": 3 if name in ("jarvis-boss", "jarvis-council") else 2 if name != "jarvis" else 1,
+                "status": "running" if running else "configured",
+                "last_seen": datetime.now(timezone.utc).isoformat() if running else None,
+                "model": model,
+                "provider": provider,
+                "role": profile.get("description", ""),
+                "project": "",
+                "source": str(p),
+            })
+        return agents
+
+    def _scan_tasks(self):
+        tasks = []
+        for p in sorted((DASHBOARD_DATA / "tasks").glob("*.json")):
+            try:
+                data = json.loads(p.read_text())
+            except Exception:
+                continue
+            if isinstance(data, list):
+                tasks.extend(data)
+            elif isinstance(data, dict):
+                tasks.append(data)
+        return tasks
+
+    def _scan_kanban(self):
+        """Read kanban.db tasks grouped by project."""
+        if not KANBAN_DB.exists():
+            return {}
+        try:
+            conn = sqlite3.connect(str(KANBAN_DB), timeout=5.0)
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT t.id, t.title, t.status, t.assignee, t.priority, t.project,
+                       t.last_heartbeat_at, t.body, t.created_at, t.updated_at,
+                       (SELECT GROUP_CONCAT(parent_id) FROM task_deps WHERE child_id = 't_' || t.id) as parents
+                FROM tasks t
+                WHERE t.status NOT IN ('archived','cancelled')
+                ORDER BY t.project, t.priority DESC
+            """)
+            rows = [dict(r) for r in cur.fetchall()]
+            for r in rows:
+                r["id"] = f"t_{r['id']}"
+                # Resolve blocked_by_parents
+                if r.get("parents"):
+                    parent_ids = r["parents"].split(",")
+                    placeholders = ",".join(["?"] * len(parent_ids))
+                    cur.execute(f"SELECT status FROM tasks WHERE 't_' || id IN ({placeholders})", parent_ids)
+                    parent_statuses = [s[0] for s in cur.fetchall()]
+                    r["blocked_by_parents"] = any(s != "done" for s in parent_statuses)
+                else:
+                    r["blocked_by_parents"] = False
+                # Comment count
+                cur.execute("SELECT COUNT(*) FROM task_comments WHERE task_id = ?", (r["id"],))
+                r["comment_count"] = cur.fetchone()[0]
+                # Run count
+                cur.execute("SELECT COUNT(*) FROM task_runs WHERE task_id = ?", (r["id"],))
+                r["run_count"] = cur.fetchone()[0]
+            conn.close()
+
+            by_project = {}
+            for r in rows:
+                proj = r.get("project") or "default"
+                by_project.setdefault(proj, []).append(r)
+            return by_project
+        except Exception:
+            return {}
+
+    def _first_heading(self, path: Path) -> str:
+        try:
+            for line in path.read_text(errors="ignore").splitlines()[:40]:
+                line = line.strip()
+                if line.startswith("#"):
+                    return line.lstrip("#").strip() or path.stem
+        except Exception:
+            pass
+        return path.stem.replace("-", " ").replace("_", " ").title()
+
+    def _file_timestamp(self, path: Path) -> str:
+        try:
+            return datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat()
+        except Exception:
+            return ""
+
+    def _scan_decisions(self):
+        decisions = []
+        roots = [
+            DASHBOARD_DATA / "decisions",
+            HOME / "Obsidian" / "Vault" / "08 Decisions",
+        ]
+        seen = set()
+        for root in roots:
+            if not root.exists():
+                continue
+            for p in sorted(root.glob("*.md")):
+                key = str(p.resolve())
+                if key in seen:
+                    continue
+                seen.add(key)
+                text = ""
+                try:
+                    text = p.read_text(errors="ignore")[:4000]
+                except Exception:
+                    pass
+                project = ""
+                for proj_dir in sorted((HOME / ".hermes" / "memory" / "projects").glob("*")):
+                    if proj_dir.is_dir() and proj_dir.name in text:
+                        project = proj_dir.name
+                        break
+                decisions.append({
+                    "id": p.stem,
+                    "title": self._first_heading(p),
+                    "source": str(p),
+                    "project": project,
+                    "created_at": self._file_timestamp(p),
+                    "tier": 0,
+                })
+        project_root = HOME / ".hermes" / "memory" / "projects"
+        if project_root.exists():
+            for proj_dir in sorted(project_root.iterdir()):
+                if not proj_dir.is_dir():
+                    continue
+                p = proj_dir / "decisions.md"
+                if not p.exists():
+                    continue
+                key = str(p.resolve())
+                if key in seen:
+                    continue
+                seen.add(key)
+                decisions.append({
+                    "id": f"{proj_dir.name}-decisions",
+                    "title": self._first_heading(p) or f"{proj_dir.name} decisions",
+                    "source": str(p),
+                    "project": proj_dir.name,
+                    "created_at": self._file_timestamp(p),
+                    "tier": 0,
+                })
+        return decisions
+
+    def _scan_memory(self):
+        memory = {}
+        roots = [
+            DASHBOARD_DATA / "memory",
+            PROFILE / "jarvis" / "memories",
+            HOME / "Obsidian" / "Vault" / "Memory",
+            HOME / "Obsidian" / "Vault" / "00 Memory",
+        ]
+        project_names = []
+        project_root = HOME / ".hermes" / "memory" / "projects"
+        if project_root.exists():
+            project_names = [p.name for p in project_root.iterdir() if p.is_dir()]
+        for root in roots:
+            if not root.exists():
+                continue
+            for p in sorted(root.glob("*.md")):
+                key = p.stem
+                if key in memory:
+                    key = hashlib.sha1(str(p).encode()).hexdigest()[:10] + "-" + key
+                text = ""
+                try:
+                    text = p.read_text(errors="ignore")[:4000]
+                except Exception:
+                    pass
+                project = next((proj for proj in project_names if proj in text), "")
+                memory[key] = {
+                    "key": key,
+                    "title": self._first_heading(p),
+                    "source": str(p),
+                    "project": project,
+                    "kind": "profile-memory" if "memories" in p.parts else "obsidian-memory",
+                    "updated_at": self._file_timestamp(p),
+                }
+        if project_root.exists():
+            for proj_dir in sorted(project_root.iterdir()):
+                if not proj_dir.is_dir():
+                    continue
+                for p, kind, title in [
+                    (proj_dir / "context.json", "project-context", f"{proj_dir.name} context"),
+                    (proj_dir / "decisions.md", "project-decisions", f"{proj_dir.name} decisions"),
+                    (proj_dir / "memory.jsonl", "project-memory", f"{proj_dir.name} memory"),
+                ]:
+                    if not p.exists():
+                        continue
+                    key = f"{proj_dir.name}-{p.stem}"
+                    memory[key] = {
+                        "key": key,
+                        "title": title if p.suffix != ".md" else self._first_heading(p),
+                        "source": str(p),
+                        "project": proj_dir.name,
+                        "kind": kind,
+                        "updated_at": self._file_timestamp(p),
+                    }
+                sessions = proj_dir / "sessions"
+                if sessions.exists():
+                    latest = sorted(sessions.glob("*.jsonl"), key=lambda x: x.stat().st_mtime, reverse=True)[:3]
+                    for p in latest:
+                        key = f"{proj_dir.name}-session-{p.stem}"
+                        memory[key] = {
+                            "key": key,
+                            "title": f"{proj_dir.name} session {p.stem}",
+                            "source": str(p),
+                            "project": proj_dir.name,
+                            "kind": "project-session",
+                            "updated_at": self._file_timestamp(p),
+                        }
+        return memory
+
+    def _scan_metrics(self):
+        metrics = {}
+        for p in sorted((DASHBOARD_DATA / "metrics").glob("*.json")):
+            try:
+                data = json.loads(p.read_text())
+            except Exception:
+                continue
+            if isinstance(data, dict):
+                metrics.update(data)
+        return metrics
+
+    def _scan_gateway(self):
+        gateway = {}
+        for p in sorted((DASHBOARD_DATA / "gateway").glob("*.json")):
+            try:
+                data = json.loads(p.read_text())
+            except Exception:
+                continue
+            if isinstance(data, dict):
+                gateway.update(data)
+        return gateway
+
+    def _scan_projects(self):
+        projects = []
+        vault_root = Path("~/.hermes/memory/projects").expanduser()
+        if not vault_root.exists():
+            return projects
+        for p in sorted(vault_root.iterdir()):
+            if p.is_dir():
+                ctx_file = p / "context.json"
+                if ctx_file.exists():
+                    try:
+                        ctx = json.loads(ctx_file.read_text())
+                        projects.append({
+                            "slug": p.name,
+                            "name": ctx.get("name", p.name.replace("-", " ").title()),
+                            "mode": ctx.get("mode", "standard"),
+                            "source": str(ctx_file),
+                        })
+                    except Exception:
+                        pass
+                else:
+                    # Vault dir exists but no context — still list it
+                    projects.append({
+                        "slug": p.name,
+                        "name": p.name.replace("-", " ").title(),
+                        "source": str(p),
+                    })
+        return projects
+
+    def _scan_sessions(self):
+        sessions = []
+        sessions_dir = DASHBOARD_DATA / "sessions"
+        if not sessions_dir.exists():
+            return sessions
+        for p in sorted(sessions_dir.glob("*.json")):
+            try:
+                data = json.loads(p.read_text())
+            except Exception:
+                continue
+            if isinstance(data, dict):
+                sessions.append(data)
+            elif isinstance(data, list):
+                sessions.extend(data)
+        return sessions
+
+    def write_cache(self):
+        try:
+            CACHE_FILE.write_text(json.dumps(self.cache, indent=2, default=str))
+        except Exception:
+            pass

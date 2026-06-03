@@ -1,0 +1,17 @@
+{
+  "name": "jarvis-dashboard",
+  "version": "1.1.0",
+  "description": "A sophisticated control panel for overseeing and interacting with collaborative AI agent networks.",
+  "author": "jarvis-manager",
+  "entry": {
+    "api": "backend/server.py",
+    "tab": "frontend/public/index.html",
+    "css": "frontend/public/style.css",
+    "js": "frontend/public/main.js"
+  },
+  "api_mount": "/api/plugins/jarvis-dashboard",
+  "tab_label": "War Room",
+  "icon": "shield-half",
+  "requires_auth": true,
+  "permissions": ["kanban_read", "task_read", "memory_read", "metrics_read"]
+}
