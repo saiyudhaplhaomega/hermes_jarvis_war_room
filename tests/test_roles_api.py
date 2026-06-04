@@ -14,6 +14,7 @@ def _load_app(monkeypatch, tmp_path):
     data_file = tmp_path / "role_mappings.json"
     monkeypatch.setenv("JARVIS_DASHBOARD_ROLE_MAPPINGS", str(data_file))
     monkeypatch.setenv("JARVIS_DASHBOARD_DEV_TOKEN", "test-token")
+    monkeypatch.setenv("JARVIS_DASHBOARD_QUERY_TOKEN_FALLBACK", "1")
     for name in list(sys.modules):
         if name == "server" or name.startswith("api.roles"):
             sys.modules.pop(name, None)

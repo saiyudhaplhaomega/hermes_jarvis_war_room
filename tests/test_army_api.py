@@ -10,6 +10,7 @@ sys.path.insert(0, str(BACKEND))
 
 def _load_app(monkeypatch, tmp_path):
     monkeypatch.setenv("JARVIS_DASHBOARD_DEV_TOKEN", "test-token")
+    monkeypatch.setenv("JARVIS_DASHBOARD_QUERY_TOKEN_FALLBACK", "1")
     monkeypatch.setenv("JARVIS_DASHBOARD_ARMY_STATE", str(tmp_path / "army_state.json"))
     monkeypatch.setenv("JARVIS_DASHBOARD_ARMY_RUNS", str(tmp_path / "army_runs"))
     monkeypatch.setenv("JARVIS_DASHBOARD_ARMY_DISABLE_EXEC", "1")

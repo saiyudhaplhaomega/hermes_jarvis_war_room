@@ -9,7 +9,7 @@ Group=ubuntu
 WorkingDirectory=/home/ubuntu/.hermes/profiles/jarvis/plugins/jarvis-dashboard/backend
 Environment="PATH=/home/ubuntu/.hermes/profiles/jarvis/plugins/jarvis-dashboard/venv/bin:/usr/bin"
 Environment="PYTHONPATH=/home/ubuntu/.hermes/profiles/jarvis/plugins/jarvis-dashboard/backend"
-ExecStart=/home/ubuntu/.hermes/profiles/jarvis/plugins/jarvis-dashboard/venv/bin/uvicorn server:app --host 0.0.0.0 --port 8502 --workers 1 --log-level info --no-access-log
+ExecStart=/home/ubuntu/.hermes/profiles/jarvis/plugins/jarvis-dashboard/venv/bin/uvicorn server:app --host 127.0.0.1 --port 8502 --workers 1 --log-level info --no-access-log
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

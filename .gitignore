@@ -41,3 +41,27 @@ yarn-error.log*
 
 # Keep built React dist committed intentionally for recovery/deployment snapshot.
 # frontend-react/dist/ is NOT ignored.
+
+# --- Additive 2026-06-04 (no removals) ---
+# Local cloudflared/quick-tunnel scratch
+state/release/iron-law*.json
+state/release/*.json
+state/release/*.txt
+state/cloudflared.log
+state/backend-live.log
+state/spa-live.log
+
+# Hermes-managed run state
+state/run/
+state/run-*.json
+state/*.pid
+state/*.sock
+
+# Local Claude / War Room scratch (reproducible)
+.claude/
+.war-room-scratch/
+
+# Local edit backups (extra)
+*.swp
+*~
+*.orig

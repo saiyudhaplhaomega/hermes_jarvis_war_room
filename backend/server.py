@@ -1,12 +1,13 @@
 """FastAPI entry point — Jarvis War Room Dashboard Plugin v1.1.0."""
-import sys, asyncio, threading, json, logging
+import sys, asyncio, threading, json, logging, os
 from pathlib import Path
 
 log = logging.getLogger("jarvis-dashboard")
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from fastapi import FastAPI, APIRouter, WebSocket
+from fastapi import FastAPI, APIRouter, WebSocket, Depends, Response, Request, HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from core.config import API_HOST, API_PORT, AGGREGATE_INTERVAL
@@ -30,6 +31,7 @@ from jarvis_company_os.router import router as jarvis_company_os_router
 from jarvis_company_os.migrations import apply_pending
 from jarvis_company_os.registry import seed_default_company
 from jarvis_company_os import gen_agent_files as gen_files_mod
+from auth.dependencies import SESSION_COOKIE_NAME, get_current_user, get_current_user_cookie_only
 
 aggregator = DataAggregator()
 
@@ -84,7 +86,7 @@ app = FastAPI(
 # ─── CORS ───────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:8503","http://127.0.0.1:8513","http://43.131.26.109:8503","http://localhost:8503","http://localhost:8513"],
+    allow_origins=["http://127.0.0.1:8503", "http://127.0.0.1:8513", "http://localhost:8503", "http://localhost:8513", "https://courage-bigger-monthly-corn.trycloudflare.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -114,7 +116,9 @@ app.add_middleware(RateLimitMiddleware)
 # ─── WebSocket endpoint ─────────────────────────────
 @app.websocket("/api/plugins/jarvis-dashboard/v1/ws")
 async def ws_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
+    connected = await manager.connect(websocket)
+    if not connected:
+        return
     try:
         while True:
             raw = await websocket.receive_text()
@@ -138,6 +142,72 @@ async def ws_endpoint(websocket: WebSocket):
 
 # ─── Plugin router ──────────────────────────────────
 plugin = APIRouter(prefix="/api/plugins/jarvis-dashboard/v1")
+
+
+@plugin.post("/auth/session")
+def create_auth_session(response: Response, user: str = Depends(get_current_user)):
+    """Bootstrap browser WebSocket auth with an HttpOnly cookie.
+
+    The response intentionally returns only the user identity, never the token.
+    """
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        os.environ.get("JARVIS_DASHBOARD_DEV_TOKEN", ""),
+        httponly=True,
+        samesite="lax",
+        secure=False,
+        path="/api/plugins/jarvis-dashboard/v1",
+    )
+    return {"status": "ok", "user": user}
+
+
+@plugin.post("/sse-session", status_code=204)
+def create_sse_session(_response: Response, _user: str = Depends(get_current_user)):
+    """Bootstrap browser EventSource auth with an HttpOnly cookie.
+
+    EventSource cannot send Authorization headers. This endpoint intentionally
+    returns no body and never echoes the token.
+    """
+    response = Response(status_code=204)
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        os.environ.get("JARVIS_DASHBOARD_DEV_TOKEN", ""),
+        httponly=True,
+        samesite="lax",
+        secure=False,
+        path="/api/plugins/jarvis-dashboard/v1",
+    )
+    return response
+
+
+def _redacted_query_denial_log(request: Request, reason: str) -> None:
+    log.warning(
+        "%s path=%s client=%s query_keys=%s",
+        reason,
+        request.url.path,
+        request.client.host if request.client else "unknown",
+        sorted(request.query_params.keys()),
+    )
+
+
+@plugin.get("/events")
+def events(request: Request):
+    """Cookie-only SSE endpoint for War Room browser event plumbing."""
+    if "token" in request.query_params:
+        _redacted_query_denial_log(request, "sse_token_url_rejected")
+        raise HTTPException(status_code=401, detail="Authentication required")
+    get_current_user_cookie_only(request)
+
+    def stream():
+        yield 'event: ready\ndata: {"status":"ok"}\n\n'
+
+    return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@plugin.get("/ready")
+def ready(_user: str = Depends(get_current_user)):
+    return {"status": "ready", "plugin": "jarvis-dashboard", "version": "1.1.0"}
+
 plugin.include_router(cache_router, prefix="/dashboard")
 plugin.include_router(kanban_router)
 plugin.include_router(nl_router)
@@ -160,4 +230,4 @@ def health():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host=API_HOST, port=API_PORT, log_level="info")
+    uvicorn.run(app, host=API_HOST, port=API_PORT, log_level="info", access_log=False)

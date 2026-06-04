@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://jarvis.local/schemas/decision-record.json",
+  "title": "War Room Decision Record",
+  "description": "Minimum required shape for a Decision Brief backing record.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "decision_id",
+    "decision_class",
+    "context",
+    "recommendation",
+    "options",
+    "status"
+  ],
+  "properties": {
+    "decision_id": {
+      "type": "string",
+      "pattern": "^D-[0-9]{4}-[0-9]{2}-[0-9]{2}-[a-z0-9][a-z0-9-]{0,40}$"
+    },
+    "decision_class": {
+      "type": "string",
+      "enum": ["mechanical", "taste", "user_challenge"]
+    },
+    "context": {"type": "string", "minLength": 1},
+    "recommendation": {"type": "string", "minLength": 1},
+    "options": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 4,
+      "items": {"type": "object", "required": ["label", "summary"]}
+    },
+    "risks": {"type": "array"},
+    "reversibility": {"type": "string", "enum": ["easy", "recoverable", "irreversible"]},
+    "acceptance": {"type": "string"},
+    "status": {
+      "type": "string",
+      "enum": ["draft", "approved", "rejected", "superseded"]
+    }
+  }
+}
