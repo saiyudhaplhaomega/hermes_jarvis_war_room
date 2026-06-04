@@ -21,7 +21,7 @@ export function DecisionLog() {
 
   return (
     <div className="card">
-      <PanelHeader title="Decision Log" badge={`${projectSlug || 'all'} · ${decisions.length} decisions`} />
+      <PanelHeader title="Decision Log" badge={`${projectSlug || 'all'} · ${decisions.length} decisions`} collapsible />
       <div className="text-[10px] text-gray-500 mb-2 truncate">
         Scope: {projectSlug || 'global'}
       </div>

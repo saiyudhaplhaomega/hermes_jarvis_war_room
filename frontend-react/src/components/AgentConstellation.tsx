@@ -9,7 +9,7 @@ export function AgentConstellation() {
 
   return (
     <div className="card">
-      <PanelHeader title="Agent Constellation" badge={`${alive} alive`} />
+      <PanelHeader title="Agent Constellation" badge={`${alive} alive`} collapsible />
       <div className="grid grid-cols-2 gap-2">
         {agents.map(agent => (
           <div key={agent.name} className="flex items-center gap-2 p-2 rounded bg-[#0f172a]">

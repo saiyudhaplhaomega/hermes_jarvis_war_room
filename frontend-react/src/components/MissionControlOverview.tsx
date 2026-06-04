@@ -6,6 +6,21 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat('en-US').format(value);
 }
 
+type RadarTone = 'online' | 'idle' | 'error' | 'unknown';
+
+function toneForStatus(status: unknown): RadarTone {
+  const s = String(status || '').toLowerCase();
+  if (['online', 'active', 'running'].includes(s)) return 'online';
+  if (['idle', 'ready'].includes(s)) return 'idle';
+  if (['error', 'offline', 'failed', 'down'].includes(s)) return 'error';
+  return 'unknown';
+}
+
+function RadarDot({ status }: { status: unknown }) {
+  const tone = toneForStatus(status);
+  return <span data-testid="radar-dot" className={`radar-dot radar-dot--${tone}`} title={String(status || 'unknown')} />;
+}
+
 export function MissionControlOverview() {
   const { cache, error } = useDashboard();
   const { project } = useProject();
@@ -47,9 +62,18 @@ export function MissionControlOverview() {
               const radius = 26 + (index % 4) * 13;
               const x = 50 + Math.cos(angle) * radius;
               const y = 50 + Math.sin(angle) * radius;
-              return <span key={agent.name} className="radar-dot" title={`${agent.name} · ${agent.status}`} style={{ left: `${x}%`, top: `${y}%` }} />;
+              return (
+                <span
+                  key={agent.name}
+                  className="radar-dot-wrap"
+                  style={{ left: `${x}%`, top: `${y}%` }}
+                  title={`${agent.name} · ${toneForStatus(agent.status)}`}
+                >
+                  <RadarDot status={agent.status} />
+                </span>
+              );
             })}
-            <div className="radar-sweep" />
+            <div className="radar-sweep" data-testid="radar-sweep" />
           </div>
           <div className="mt-3 text-xs text-gray-400">{runningAgents} running / {agents.length} configured</div>
         </div>

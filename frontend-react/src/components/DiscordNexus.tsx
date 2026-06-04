@@ -17,7 +17,7 @@ export function DiscordNexus() {
 
   return (
     <div className="card">
-      <PanelHeader title="Discord Nexus" badge={`${threads.length} threads`} />
+      <PanelHeader title="Discord Nexus" badge={`${threads.length} threads`} collapsible />
       <div className="space-y-2 max-h-[300px] overflow-y-auto">
         {threads.map((thread) => (
           <div key={thread.thread_id || `${thread.channel_id}-${thread.thread_name}`} className="text-xs p-2 rounded bg-[#0f172a] border border-jarvis-border">
