@@ -86,7 +86,7 @@ app = FastAPI(
 # ─── CORS ───────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:8503", "http://127.0.0.1:8513", "http://localhost:8503", "http://localhost:8513"],
+    allow_origins=["http://127.0.0.1:8503", "http://127.0.0.1:8513", "http://localhost:8503", "http://localhost:8513", "https://courage-bigger-monthly-corn.trycloudflare.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
