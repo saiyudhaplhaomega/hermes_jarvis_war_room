@@ -8,7 +8,14 @@ import http.server, socketserver, os, sys, mimetypes, threading, time, re
 import urllib.parse
 import urllib.request, json as json_mod
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8503
+def _arg_int(index: int, default: int) -> int:
+    try:
+        return int(sys.argv[index])
+    except (IndexError, TypeError, ValueError):
+        return default
+
+
+PORT = _arg_int(1, 8503)
 ROOT = sys.argv[2] if len(sys.argv) > 2 else "/home/ubuntu/.hermes/profiles/jarvis/plugins/jarvis-dashboard/frontend-react/dist"
 HOST = sys.argv[3] if len(sys.argv) > 3 else "127.0.0.1"
 INDEX = os.path.join(ROOT, "index.html")
@@ -27,6 +34,17 @@ RUNTIME_CONFIG = """window.__CONFIG__ = {
   TOKEN: %s,
   WS_URL: (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/api/plugins/jarvis-dashboard/v1/ws'
 };""" % json_mod.dumps(os.environ.get("JARVIS_DASHBOARD_DEV_TOKEN", ""))
+
+def _content_security_policy() -> str:
+    return (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "connect-src 'self' ws://127.0.0.1:8503 ws://localhost:8503 wss://127.0.0.1:8503 wss://localhost:8503; "
+        "img-src 'self' data: https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com;"
+    )
+
 
 def _inject_config(html: bytes) -> bytes:
     text = html.decode('utf-8')
@@ -146,13 +164,7 @@ class SPAHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
             self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
-            self.send_header("Content-Security-Policy",
-                "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com; "
-                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-                "connect-src 'self' ws://* wss://*; "
-                "img-src 'self' data: https://fonts.googleapis.com; "
-                "font-src 'self' https://fonts.gstatic.com;")
+            self.send_header("Content-Security-Policy", _content_security_policy())
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("X-Frame-Options", "DENY")
             self.end_headers()

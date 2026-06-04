@@ -18,14 +18,17 @@ class ConnectionManager:
         self.subscriptions: Dict[WebSocket, Set[str]] = {}
 
     async def connect(self, websocket: WebSocket):
-        # Auth BEFORE accept — reject invalid tokens at HTTP layer
-        token = websocket.query_params.get("token", "")
+        # Auth BEFORE accept — reject invalid tokens at the WebSocket policy layer.
         try:
-            from auth.dependencies import get_current_user_ws
-            user = get_current_user_ws(token)
+            from auth.dependencies import SESSION_COOKIE_NAME, get_current_user_ws
+            get_current_user_ws(
+                cookie_token=websocket.cookies.get(SESSION_COOKIE_NAME),
+                authorization=websocket.headers.get("Authorization"),
+                query_token=websocket.query_params.get("token"),
+            )
         except Exception:
             await websocket.close(code=4001, reason="auth required")
-            return
+            return False
         await websocket.accept()
         self.connections.append(websocket)
         self.subscriptions[websocket] = set()
@@ -35,6 +38,7 @@ class ConnectionManager:
             await self.send(websocket, {"type": "snapshot", "payload": dict(LIVE_CACHE)})
         except Exception:
             pass
+        return True
 
     def disconnect(self, websocket: WebSocket):
         if websocket in self.connections:

@@ -1,5 +1,12 @@
 
-"""Lightweight auth for Phase 1 (localhost)."""
+"""Lightweight War Room auth helpers.
+
+Batch A rules:
+- normal REST auth uses Authorization: Bearer or the HttpOnly session cookie;
+- URL query-token auth is disabled unless explicitly enabled for compatibility;
+- WebSocket auth uses the session cookie because browser WebSockets cannot set
+  arbitrary Authorization headers.
+"""
 import os
 import secrets
 from fastapi import Request, HTTPException, WebSocketException, status
@@ -7,36 +14,83 @@ from typing import Optional
 
 DEV_TOKEN = os.environ.get("JARVIS_DASHBOARD_DEV_TOKEN", "")
 DEV_USER = os.environ.get("JARVIS_DASHBOARD_DEV_USER", "saiyudh")
+SESSION_COOKIE_NAME = "jarvis-dashboard-token"
+QUERY_TOKEN_FALLBACK = os.environ.get("JARVIS_DASHBOARD_QUERY_TOKEN_FALLBACK", "0").lower() in {"1", "true", "yes", "on"}
 
 
 def _is_dev_token(token: Optional[str]) -> bool:
     return bool(token and DEV_TOKEN and secrets.compare_digest(token, DEV_TOKEN))
 
 
-def get_current_user(request: Request) -> str:
-    """
-    Phase 1 auth: accept a configured dev token query param or a JWT cookie.
-    No localhost fallthrough — auth is mandatory everywhere.
-    """
-    token = request.cookies.get("jarvis-dashboard-token")
+def _bearer_token(authorization: Optional[str]) -> Optional[str]:
+    if not authorization:
+        return None
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token.strip():
+        return None
+    return token.strip()
+
+
+def _decode_subject(token: Optional[str]) -> Optional[str]:
+    if _is_dev_token(token):
+        return DEV_USER
     if not token:
-        token = request.query_params.get("token")
-    if _is_dev_token(token):
-        return DEV_USER
+        return None
     try:
         from auth.jwt_handler import decode_token
         payload = decode_token(token)
         return payload.get("sub", "anonymous")
     except Exception:
-        raise HTTPException(status_code=401, detail="Authentication required")
+        return None
 
 
-def get_current_user_ws(token: Optional[str] = None) -> str:
-    if _is_dev_token(token):
-        return DEV_USER
-    try:
-        from auth.jwt_handler import decode_token
-        payload = decode_token(token)
-        return payload.get("sub", "anonymous")
-    except Exception:
-        raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="auth required")
+def get_current_user(request: Request) -> str:
+    """Return authenticated user or raise 401.
+
+    Query token fallback is intentionally off by default so tokens do not leak
+    through browser history, reverse-proxy logs, or access logs.
+    """
+    candidates = [
+        _bearer_token(request.headers.get("Authorization")),
+        request.cookies.get(SESSION_COOKIE_NAME),
+    ]
+    if QUERY_TOKEN_FALLBACK:
+        candidates.append(request.query_params.get("token"))
+
+    for token in candidates:
+        subject = _decode_subject(token)
+        if subject:
+            return subject
+    raise HTTPException(status_code=401, detail="Authentication required")
+
+
+def get_current_user_cookie_only(request: Request) -> str:
+    """Return authenticated user from the HttpOnly dashboard cookie only.
+
+    SSE/EventSource cannot set Authorization headers. It must not accept URL
+    tokens, even when the legacy query fallback is enabled for other surfaces.
+    """
+    subject = _decode_subject(request.cookies.get(SESSION_COOKIE_NAME))
+    if subject:
+        return subject
+    raise HTTPException(status_code=401, detail="Authentication required")
+
+
+def get_current_user_ws(
+    *,
+    cookie_token: Optional[str] = None,
+    authorization: Optional[str] = None,
+    query_token: Optional[str] = None,
+) -> str:
+    candidates = [
+        _bearer_token(authorization),
+        cookie_token,
+    ]
+    if QUERY_TOKEN_FALLBACK:
+        candidates.append(query_token)
+
+    for token in candidates:
+        subject = _decode_subject(token)
+        if subject:
+            return subject
+    raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="auth required")

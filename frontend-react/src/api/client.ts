@@ -9,7 +9,7 @@ import type {
 } from '../types/dashboard';
 
 const API = CONFIG.API_BASE;
-const TOKEN=CONFIG.TOKEN;
+const TOKEN = CONFIG.TOKEN;
 
 type ChatResponse = {
   response?: string;
@@ -22,19 +22,29 @@ type ChatResponse = {
   [key: string]: unknown;
 };
 
+function authHeaders(extra?: HeadersInit): HeadersInit {
+  return {
+    ...extra,
+    ...(TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {}),
+  };
+}
+
 function q(path: string, params?: Record<string, string>) {
-  let url = `${API}${path}?token=${TOKEN}`;
+  let url = `${API}${path}`;
+  const query = new URLSearchParams();
   if (params) {
     for (const [k, v] of Object.entries(params)) {
-      if (v) url += `&${encodeURIComponent(k)}=${encodeURIComponent(v)}`;
+      if (v) query.set(k, v);
     }
   }
+  const suffix = query.toString();
+  if (suffix) url += `?${suffix}`;
   return url;
 }
 
 async function get<T>(path: string, params?: Record<string, string>): Promise<T> {
   const url = q(path, params);
-  const r = await fetch(url, { headers: { Accept: 'application/json' } });
+  const r = await fetch(url, { headers: authHeaders({ Accept: 'application/json' }), credentials: 'same-origin' });
   if (!r.ok) console.warn('API GET failed:', path, r.status);
   if (!r.ok) throw new Error(`GET ${path} ${r.status}`);
   return r.json();
@@ -43,7 +53,8 @@ async function get<T>(path: string, params?: Record<string, string>): Promise<T>
 async function post<T>(path: string, body: unknown, params?: Record<string, string>): Promise<T> {
   const r = await fetch(q(path, params), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json', Accept: 'application/json' }),
+    credentials: 'same-origin',
     body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(`POST ${path} ${r.status}`);
