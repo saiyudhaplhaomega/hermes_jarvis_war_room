@@ -91,6 +91,7 @@ export function KanbanFleet() {
         title="Kanban Fleet"
         badge={project ? `Project: ${project.slug}` : 'No project selected'}
         right={<span className="text-xs text-gray-500 mono">{filtered.length} cards</span>}
+        collapsible
       />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         {COLUMNS.map(col => (

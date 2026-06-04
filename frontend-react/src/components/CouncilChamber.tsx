@@ -10,7 +10,7 @@ export function CouncilChamber() {
 
   return (
     <div className="card">
-      <PanelHeader title="Council Chamber" badge={`${runningCount}/${councilAgents.length} online`} />
+      <PanelHeader title="Council Chamber" badge={`${runningCount}/${councilAgents.length} online`} collapsible />
       <div className="space-y-2 max-h-[300px] overflow-y-auto">
         {councilAgents.map((agent) => {
           const alive = ['online', 'active', 'running'].includes((agent.status || '').toLowerCase());

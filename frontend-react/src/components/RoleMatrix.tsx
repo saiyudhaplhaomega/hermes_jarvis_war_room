@@ -263,6 +263,7 @@ export function RoleMatrix() {
         title="Agent Growth Studio"
         badge={`${activeCount} active`}
         right={<span className="mono text-[10px] text-emerald-300">PROFILE-SAFE OVERLAY</span>}
+        collapsible
       />
 
       <div className="mb-3 grid grid-cols-1 lg:grid-cols-4 gap-3 text-xs">

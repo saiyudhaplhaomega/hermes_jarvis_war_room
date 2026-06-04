@@ -7,7 +7,7 @@ export function GitHubWorkspace() {
 
   return (
     <div className="card">
-      <PanelHeader title="GitHub Workspace" />
+      <PanelHeader title="GitHub Workspace" collapsible />
       <div className="flex gap-2">
         <input
           type="text"

@@ -22,7 +22,7 @@ export function MemoryNexus() {
 
   return (
     <div className="card">
-      <PanelHeader title="Memory Nexus" badge={`${projectSlug || 'all'} · ${entries.length} entries`} />
+      <PanelHeader title="Memory Nexus" badge={`${projectSlug || 'all'} · ${entries.length} entries`} collapsible />
       <div className="text-[10px] text-gray-500 mb-2 truncate">
         Scope: {projectSlug || 'global'}
       </div>
