@@ -329,16 +329,76 @@ body {
   background: #7dd3fc;
   box-shadow: 0 0 16px #7dd3fc;
 }
+.radar-dot-wrap {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.radar-dot--online {
+  background: #34d399;
+  box-shadow: 0 0 16px #34d399;
+  animation: radar-pulse-online 2.4s ease-in-out infinite;
+}
+.radar-dot--idle {
+  background: #7dd3fc;
+  box-shadow: 0 0 12px rgba(125, 211, 252, 0.7);
+}
+.radar-dot--error {
+  background: #f87171;
+  box-shadow: 0 0 14px #f87171;
+}
+.radar-dot--unknown {
+  background: #6b7280;
+  box-shadow: 0 0 8px rgba(107, 114, 128, 0.5);
+}
+@keyframes radar-pulse-online {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.25); opacity: 0.85; }
+}
 .radar-sweep {
   position: absolute;
-  inset: 50% 50% auto auto;
-  width: 45%;
+  top: 50%;
+  left: 50%;
+  width: 50%;
   height: 1px;
   background: linear-gradient(90deg, #7dd3fc, transparent);
-  transform-origin: left center;
+  transform-origin: 0 0;
   animation: sweep 4s linear infinite;
+  pointer-events: none;
 }
 @keyframes sweep { to { transform: rotate(360deg); } }
+
+/* --- Collapsible panel headers (additive 2026-06-04) --- */
+.panel-collapsed { /* applies to the [data-panel-header] wrapper */ }
+.panel-collapsed + .panel-body { display: none; }
+.panel-header-toggle {
+  background: transparent;
+  border: 1px solid rgba(125, 211, 252, 0.2);
+  border-radius: 6px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #7dd3fc;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+  transition: background 0.15s ease;
+}
+.panel-header-toggle:hover {
+  background: rgba(125, 211, 252, 0.12);
+}
+.panel-collapse-icon {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+.panel-collapsed .panel-collapse-icon {
+  transform: rotate(-90deg);
+}
 .role-table th,
 .role-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); text-align: left; }
 .dashboard-layout {
