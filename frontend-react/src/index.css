@@ -353,9 +353,39 @@ body {
   background: #6b7280;
   box-shadow: 0 0 8px rgba(107, 114, 128, 0.5);
 }
+.radar-dot--configured {
+  background: #818cf8;
+  box-shadow: 0 0 10px rgba(129, 140, 248, 0.6);
+  opacity: 0.85;
+}
 @keyframes radar-pulse-online {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.25); opacity: 0.85; }
+}
+.radar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 10px;
+}
+.radar-legend-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+}
+.radar-legend-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  transform: none;
+  flex: 0 0 auto;
+}
+.radar-legend-label {
+  white-space: nowrap;
 }
 .radar-sweep {
   position: absolute;
@@ -372,7 +402,11 @@ body {
 
 /* --- Collapsible panel headers (additive 2026-06-04) --- */
 .panel-collapsed { /* applies to the [data-panel-header] wrapper */ }
-.panel-collapsed + .panel-body { display: none; }
+[data-panel-header].panel-collapsed ~ * { display: none; }
+.card:has([data-panel-header].panel-collapsed),
+.premium-card:has([data-panel-header].panel-collapsed) {
+  min-height: 0;
+}
 .panel-header-toggle {
   background: transparent;
   border: 1px solid rgba(125, 211, 252, 0.2);
