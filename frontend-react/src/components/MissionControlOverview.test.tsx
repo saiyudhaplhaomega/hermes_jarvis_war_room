@@ -131,19 +131,54 @@ describe('MissionControlOverview radar', () => {
     expect(classes.some(c => /radar-dot--unknown/.test(c))).toBe(true);
   });
 
-  it('renders the running/agents summary text', () => {
-    render(
+  it('maps configured/pending/paused/standby/disabled to --configured class', () => {
+    const { container } = render(
       <TestProviders
         cache={makeCache([
-          { name: 'a', status: 'online' },
-          { name: 'b', status: 'online' },
-          { name: 'c', status: 'idle' },
+          { name: 'a', status: 'configured' },
+          { name: 'b', status: 'pending' },
+          { name: 'c', status: 'paused' },
+          { name: 'd', status: 'standby' },
+          { name: 'e', status: 'disabled' },
         ])}
         project={makeProject()}
       >
         <MissionControlOverview />
       </TestProviders>
     );
-    expect(screen.getByText(/2 running \/ 3 configured/)).toBeInTheDocument();
+    const dots = container.querySelectorAll('[data-testid="radar-dot"]');
+    expect(dots.length).toBe(5);
+    for (const dot of dots) {
+      expect(dot.className).toMatch(/radar-dot--configured/);
+    }
+  });
+
+  it('renders a 5-entry legend with the right labels', () => {
+    render(
+      <TestProviders cache={makeCache([{ name: 'a', status: 'online' }])} project={makeProject()}>
+        <MissionControlOverview />
+      </TestProviders>
+    );
+    const legend = screen.getByTestId('radar-legend');
+    expect(legend.querySelectorAll('.radar-legend-swatch').length).toBe(5);
+    expect(legend.textContent || '').toMatch(/online/);
+    expect(legend.textContent || '').toMatch(/idle/);
+    expect(legend.textContent || '').toMatch(/error/);
+    expect(legend.textContent || '').toMatch(/staged/);
+    expect(legend.textContent || '').toMatch(/unknown/);
+  });
+
+  it('keeps typos as unknown even with the new configured bucket', () => {
+    const { container } = render(
+      <TestProviders
+        cache={makeCache([{ name: 'a', status: 'a-typo' }])}
+        project={makeProject()}
+      >
+        <MissionControlOverview />
+      </TestProviders>
+    );
+    const dot = container.querySelector('[data-testid="radar-dot"]');
+    expect(dot?.className).toMatch(/radar-dot--unknown/);
+    expect(dot?.className).not.toMatch(/radar-dot--configured/);
   });
 });

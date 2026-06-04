@@ -6,19 +6,41 @@ function formatNumber(value: number): string {
   return new Intl.NumberFormat('en-US').format(value);
 }
 
-type RadarTone = 'online' | 'idle' | 'error' | 'unknown';
+type RadarTone = 'online' | 'idle' | 'error' | 'configured' | 'unknown';
 
 function toneForStatus(status: unknown): RadarTone {
   const s = String(status || '').toLowerCase();
   if (['online', 'active', 'running'].includes(s)) return 'online';
   if (['idle', 'ready'].includes(s)) return 'idle';
   if (['error', 'offline', 'failed', 'down'].includes(s)) return 'error';
+  if (['configured', 'pending', 'paused', 'standby', 'disabled'].includes(s)) return 'configured';
   return 'unknown';
 }
 
 function RadarDot({ status }: { status: unknown }) {
   const tone = toneForStatus(status);
   return <span data-testid="radar-dot" className={`radar-dot radar-dot--${tone}`} title={String(status || 'unknown')} />;
+}
+
+const RADAR_LEGEND: Array<{ tone: RadarTone; label: string }> = [
+  { tone: 'online',     label: 'online' },
+  { tone: 'idle',       label: 'idle' },
+  { tone: 'error',      label: 'error' },
+  { tone: 'configured', label: 'staged' },
+  { tone: 'unknown',    label: 'unknown' },
+];
+
+function RadarLegend() {
+  return (
+    <div className="radar-legend" data-testid="radar-legend">
+      {RADAR_LEGEND.map(item => (
+        <span key={item.tone} className="radar-legend-swatch">
+          <span className={`radar-legend-dot radar-dot radar-dot--${item.tone}`} aria-hidden />
+          <span className="radar-legend-label">{item.label}</span>
+        </span>
+      ))}
+    </div>
+  );
 }
 
 export function MissionControlOverview() {
@@ -75,6 +97,7 @@ export function MissionControlOverview() {
             })}
             <div className="radar-sweep" data-testid="radar-sweep" />
           </div>
+          <RadarLegend />
           <div className="mt-3 text-xs text-gray-400">{runningAgents} running / {agents.length} configured</div>
         </div>
         <div className="grid grid-cols-2 gap-3">
