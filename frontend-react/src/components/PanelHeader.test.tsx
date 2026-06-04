@@ -28,20 +28,26 @@ const CSS_PATH = resolve(__dirname, '../index.css');
 let cleanupCss: () => void = () => {};
 
 beforeAll(() => {
-  // Extract just the rule we care about. The production rule is one
-  // line; we search for the closing brace on the same line.
+  // Extract the production rule. The selector has changed twice:
+  //   v1: .panel-collapsed + .panel-body   (broken)
+  //   v2: [data-panel-header].panel-collapsed + *   (one sibling only)
+  //   v3: [data-panel-header].panel-collapsed ~ *   (every sibling)
+  // Any of these is acceptable as a regression guard. We accept all
+  // three so this test does not need to change every time the
+  // selector is corrected.
   const css = readFileSync(CSS_PATH, 'utf8');
-  // Match the new selector regardless of how the test reads the
-  // current source: prefer the canonical form, fall back to whatever
-  // .panel-collapsed + ... rule is there.
   let rule = '';
-  const canonical = /\[data-panel-header\][^{]*\.panel-collapsed\s*\+\s*\*\s*\{[^}]*\}/.exec(css);
-  if (canonical) {
-    rule = canonical[0];
-  } else {
-    // Fallback: the legacy rule, which would prove the regression.
-    const legacy = /\.panel-collapsed\s*\+\s*\.panel-body\s*\{[^}]*\}/.exec(css);
-    if (legacy) rule = legacy[0];
+  const candidates = [
+    // v3: general-sibling
+    /\[data-panel-header\][^{}]*\.panel-collapsed\s*~\s*\*\s*\{[^}]*\}/,
+    // v2: adjacent-sibling
+    /\[data-panel-header\][^{}]*\.panel-collapsed\s*\+\s*\*\s*\{[^}]*\}/,
+    // v1: legacy broken form
+    /\.panel-collapsed\s*\+\s*\.panel-body\s*\{[^}]*\}/,
+  ];
+  for (const re of candidates) {
+    const m = re.exec(css);
+    if (m) { rule = m[0]; break; }
   }
   expect(rule, 'expected a panel-collapsed CSS rule in src/index.css').not.toBe('');
   cleanupCss = injectCssRule(rule);

@@ -35,6 +35,7 @@ interface KanbanCtx {
 }
 
 const Ctx = createContext<KanbanCtx | null>(null);
+export const KanbanContext = Ctx;
 
 export function KanbanProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, { cards: [], loading: false, error: null });

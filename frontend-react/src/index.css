@@ -402,7 +402,11 @@ body {
 
 /* --- Collapsible panel headers (additive 2026-06-04) --- */
 .panel-collapsed { /* applies to the [data-panel-header] wrapper */ }
-[data-panel-header].panel-collapsed + * { display: none; }
+[data-panel-header].panel-collapsed ~ * { display: none; }
+.card:has([data-panel-header].panel-collapsed),
+.premium-card:has([data-panel-header].panel-collapsed) {
+  min-height: 0;
+}
 .panel-header-toggle {
   background: transparent;
   border: 1px solid rgba(125, 211, 252, 0.2);
