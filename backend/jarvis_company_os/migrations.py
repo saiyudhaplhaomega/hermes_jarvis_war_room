@@ -4,6 +4,7 @@ Boss D-A (REVISED): target = /home/ubuntu/.hermes/kanban.db (same-db strategy).
 Schema_migrations table tracks applied files; one row per filename.
 Idempotent: safe to call from server.py lifespan on every restart.
 """
+import os
 import sqlite3
 import hashlib
 import logging
@@ -12,11 +13,25 @@ from typing import List, Tuple
 
 log = logging.getLogger("jarvis_company_os.migrations")
 
-# Where the migration SQL files live (per master plan §REPO LAYOUT)
-MIGRATIONS_DIR = Path("/home/ubuntu/jarvis-war-room/migrations")
+# Where the migration SQL files live. Defaults to the legacy Ubuntu path;
+# override with JARVIS_COMPANY_OS_MIGRATIONS_DIR for portability (e.g. tests
+# + non-Ubuntu deploys). If the dir doesn't exist, apply_pending is a no-op
+# (it just logs a warning) — this is intentional, so the rest of the company
+# OS can still run.
+MIGRATIONS_DIR = Path(
+    os.environ.get(
+        "JARVIS_COMPANY_OS_MIGRATIONS_DIR",
+        "/home/ubuntu/jarvis-war-room/migrations",
+    )
+)
 
-# The actual live kanban database (Boss D-A REVISED)
-KANBAN_DB_PATH = Path("/home/ubuntu/.hermes/kanban.db")
+# The actual live kanban database. Mirrors the resolution order in
+# jarvis_company_os.registry so tests + custom deploys can override.
+if "JARVIS_COMPANY_OS_DB" in os.environ:
+    KANBAN_DB_PATH = Path(os.environ["JARVIS_COMPANY_OS_DB"])
+else:
+    from core import config as _core_config
+    KANBAN_DB_PATH = Path(_core_config.KANBAN_DB)
 
 
 def _ensure_schema_migrations(conn: sqlite3.Connection) -> None:

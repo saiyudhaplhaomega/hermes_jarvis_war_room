@@ -232,3 +232,16 @@ export interface ArmyRunRequest {
   repo?: string;
   dry_run?: boolean;
 }
+
+// D-2026-06-08-dash-4: types now live in src/domain.ts (single source
+// of truth). Re-exported here for backward compatibility with any
+// existing imports of `from '../types/dashboard'`.
+export type {
+  TopologyNode,
+  TopologyAgent,
+  TopologyEdge,
+  Topology,
+  WorkerStatus,
+  IssueState,
+  AgentRole,
+} from '../domain';

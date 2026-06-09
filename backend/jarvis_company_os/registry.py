@@ -3,6 +3,7 @@
 Implements Boss D-C: seed_default_company() runs from startup, idempotent.
 Source profiles: ~/.hermes/profiles/jarvis*/config.yaml
 """
+import os
 import sqlite3
 import json
 import logging
@@ -12,8 +13,36 @@ from typing import List, Dict, Any, Optional
 
 log = logging.getLogger("jarvis_company_os.registry")
 
-KANBAN_DB_PATH = Path("/home/ubuntu/.hermes/kanban.db")
-HERMES_HOME = Path("/home/ubuntu/.hermes")
+# Resolve the SQLite path in this order (D-2026-06-08-topology-editor sub-phase 1):
+#   1. JARVIS_COMPANY_OS_DB env var (used by tests + custom deploys)
+#   2. core.config.KANBAN_DB (the rest of the dashboard)
+#   3. Legacy hardcoded path (backwards compat for the original Ubuntu deploy)
+# The env override is the only one tests can set; the others are read-only defaults.
+
+
+def _resolve_paths() -> tuple[Path, Path]:
+    """Return (KANBAN_DB_PATH, HERMES_HOME), respecting env overrides.
+
+    This is a function (not module-level constants) so tests can monkeypatch
+    the env var *after* the module is imported and still see the right path.
+    The two module-level constants KANBAN_DB_PATH / HERMES_HOME are kept for
+    backwards compatibility but are re-evaluated lazily inside registry
+    functions.
+    """
+    home_env = os.environ.get("JARVIS_COMPANY_OS_HERMES_HOME")
+    db_env = os.environ.get("JARVIS_COMPANY_OS_DB")
+    if db_env:
+        db_path = Path(db_env)
+        if home_env:
+            home = Path(home_env)
+        else:
+            # ~/.hermes/kanban.db -> ~/.hermes (the legacy layout)
+            home = db_path.parent.parent
+    else:
+        from core import config as _core_config
+        db_path = Path(_core_config.KANBAN_DB)
+        home = _core_config.HERMES
+    return db_path, home
 
 # Council hierarchy: child -> parent (per Boss D-D verification #2)
 COUNCIL_HIERARCHY = {
@@ -63,7 +92,8 @@ TEAM_MAP = {
 
 
 def _profile_path(slug: str) -> Optional[Path]:
-    p = HERMES_HOME / "profiles" / slug / "config.yaml"
+    _db, home = _resolve_paths()
+    p = home / "profiles" / slug / "config.yaml"
     return p if p.exists() else None
 
 
@@ -103,12 +133,102 @@ def seed_default_company() -> Dict[str, Any]:
     Creates the 'jarvis-war-room' company, single 'hermes-local-0' node,
     one team per unique TEAM_MAP value, agents for every detected profile,
     reports_to + collaborates_with edges per COUNCIL_HIERARCHY/COLLABORATIONS.
-    """
-    if not KANBAN_DB_PATH.exists():
-        return {"status": "skipped", "reason": f"kanban.db not found at {KANBAN_DB_PATH}"}
 
-    conn = sqlite3.connect(str(KANBAN_DB_PATH), timeout=5.0)
+    D-2026-06-08-topology-editor (sub-phase 1): also bootstraps the schema
+    if it doesn't exist. The original Ubuntu deploy ran migrations from
+    /home/ubuntu/jarvis-war-room/migrations/*.sql (never committed); we now
+    ship the equivalent CREATE TABLE IF NOT EXISTS inline so the company OS
+    works on any host without a separate migrations step. Once we have a
+    real migrations directory, this CREATE TABLE IF NOT EXISTS is a harmless
+    no-op.
+    """
+    # Ensure parent dir + db file exist; sqlite3.connect creates the file
+    # on first open, so this just guarantees the .hermes path is writable.
+    db_path, _home = _resolve_paths()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path), timeout=5.0)
     try:
+        # Schema bootstrap (idempotent). Mirrors the original migrations/001..003.
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS companies (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                mission TEXT,
+                goal TEXT,
+                status TEXT NOT NULL DEFAULT 'active',
+                budget_tokens INTEGER,
+                budget_usd REAL,
+                policy_json TEXT,
+                require_board_approval INTEGER DEFAULT 0,
+                max_headcount INTEGER,
+                max_org_depth INTEGER,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS teams (
+                id TEXT PRIMARY KEY,
+                company_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS nodes (
+                id TEXT PRIMARY KEY,
+                kind TEXT NOT NULL,
+                address TEXT,
+                backend TEXT,
+                capacity_json TEXT,
+                status TEXT NOT NULL DEFAULT 'active',
+                namespace TEXT,
+                last_liveness_at TEXT,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS agents (
+                id TEXT PRIMARY KEY,
+                company_id TEXT NOT NULL,
+                team_id TEXT,
+                node_id TEXT,
+                name TEXT NOT NULL,
+                role TEXT,
+                worker_type TEXT,
+                status TEXT NOT NULL DEFAULT 'idle',
+                worker_kind TEXT,
+                model_binding TEXT,
+                heartbeat_schedule TEXT,
+                monthly_budget_json TEXT,
+                hire_rate_json TEXT,
+                soul_path TEXT,
+                agent_card_json TEXT,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS edges (
+                id TEXT PRIMARY KEY,
+                company_id TEXT NOT NULL,
+                type TEXT NOT NULL,
+                from_agent TEXT,
+                to_agent TEXT,
+                meta_json TEXT,
+                created_at TEXT DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS budgets (
+                id TEXT PRIMARY KEY,
+                scope TEXT,
+                scope_id TEXT,
+                period TEXT,
+                tokens_limit INTEGER,
+                usd_limit REAL,
+                requests_limit INTEGER,
+                reset_at TEXT
+            );
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id TEXT PRIMARY KEY,
+                ts TEXT DEFAULT (datetime('now')),
+                actor TEXT,
+                action TEXT,
+                target TEXT,
+                detail_json TEXT
+            );
+        """)
+        conn.commit()
+
         # Idempotency check
         cur = conn.execute("SELECT COUNT(*) FROM companies")
         if cur.fetchone()[0] > 0:
@@ -146,12 +266,19 @@ def seed_default_company() -> Dict[str, Any]:
                 (t, company_id, t.title()),
             )
 
-        # 4. Discover profiles
-        profile_dir = HERMES_HOME / "profiles"
-        detected = sorted(
-            p.name for p in profile_dir.iterdir()
-            if p.is_dir() and (p / "config.yaml").exists()
-        )
+        # 4. Discover profiles (graceful if profiles dir doesn't exist yet —
+        # this is a fresh environment and the seed shouldn't crash).
+        _db, home = _resolve_paths()
+        profile_dir = home / "profiles"
+        log.info("seed_default_company: profile_dir=%s exists=%s", profile_dir, profile_dir.exists())
+        if profile_dir.exists():
+            detected = sorted(
+                p.name for p in profile_dir.iterdir()
+                if p.is_dir() and (p / "config.yaml").exists()
+            )
+        else:
+            log.info("seed_default_company: no profiles dir at %s; seeding with 0 agents", profile_dir)
+            detected = []
 
         # 5. Agents
         for slug in detected:
@@ -176,7 +303,7 @@ def seed_default_company() -> Dict[str, Any]:
                     json.dumps({"tokens": 1_000_000, "usd": 5.0,
                                 "requests_limit": requests_cap}),
                     json.dumps({"count": 0, "window": "24h", "reset_at": None}),
-                    str(HERMES_HOME / "profiles" / slug / "SOUL.md"),
+                    str(home / "profiles" / slug / "SOUL.md"),
                 ),
             )
             # Per-agent budget row
@@ -241,7 +368,8 @@ def seed_default_company() -> Dict[str, Any]:
 
 def get_topology(company_id: str) -> Dict[str, Any]:
     """Boss D4 (D-D acceptance): response shape {nodes, agents, edges}."""
-    conn = sqlite3.connect(str(KANBAN_DB_PATH), timeout=5.0)
+    db_path, _home = _resolve_paths()
+    conn = sqlite3.connect(str(db_path), timeout=5.0)
     conn.row_factory = sqlite3.Row
     try:
         nodes = [dict(r) for r in conn.execute(

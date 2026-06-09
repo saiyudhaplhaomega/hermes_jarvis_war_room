@@ -65,3 +65,8 @@ state/*.sock
 *.swp
 *~
 *.orig
+
+# D-2026-06-08 session throwaways
+_research/
+_test.txt
+research/

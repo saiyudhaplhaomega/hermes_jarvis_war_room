@@ -1,0 +1,81 @@
+{
+  "$schema": "./registry.schema.json",
+  "version": "0.1.0",
+  "last_updated": "2026-06-08",
+  "description": "War Room's skills marketplace. Per Loop 4 R6: separate skills/*.md files, lightweight registry, compatible with `npx skills add <repo>` pattern. Skills advertise triggers; the agent activates them on signal. Pre-flight selection picks 2-3 most likely skills per task.",
+  "composition_strategy": "pre-flight 2-3 + lazy activation (per Loop 4 R10)",
+  "skills": [
+    {
+      "name": "code-review",
+      "path": "code-review.md",
+      "purpose": "Review a PR or diff for correctness, style, security, and tests.",
+      "triggers": ["review", "pr", "pull request", "diff", "code review"],
+      "required_tools": ["git", "codex CLI"],
+      "maturity": "stable",
+      "owner": "engineering"
+    },
+    {
+      "name": "perspective-guided-research",
+      "path": "perspective-guided-research.md",
+      "purpose": "Apply STORM's multi-perspective questioning to a research question.",
+      "triggers": ["research", "investigate", "compare", "evaluate", "analyze"],
+      "required_tools": ["ollama", "codex CLI", "graphiti (optional)"],
+      "maturity": "stable",
+      "owner": "research"
+    },
+    {
+      "name": "incident-triage",
+      "path": "incident-triage.md",
+      "purpose": "First 5 minutes of any incident. Severity, scope, immediate mitigation.",
+      "triggers": ["incident", "outage", "broken", "down", "error spike"],
+      "required_tools": ["langfuse (optional)"],
+      "maturity": "stable",
+      "owner": "finance-ops"
+    },
+    {
+      "name": "codex-then-ollama",
+      "path": "codex-then-ollama.md",
+      "purpose": "Two-stage LLM call: codex for first draft, ollama qwen2.5:7b for independent second opinion. Cheaper than full council.",
+      "triggers": ["draft", "summarize", "explain", "default"],
+      "required_tools": ["codex CLI", "ollama"],
+      "maturity": "stable",
+      "owner": "research"
+    },
+    {
+      "name": "council-vote",
+      "path": "council-vote.md",
+      "purpose": "Run a 3-stage council vote (parallel → anonymized rank → chairman). Reserve for strategic decisions.",
+      "triggers": ["decide", "tradeoff", "architecture", "should we", "which one"],
+      "required_tools": ["codex CLI", "ollama", "codex subprocess timeout"],
+      "maturity": "stable",
+      "owner": "council"
+    },
+    {
+      "name": "agent-soul-update",
+      "path": "agent-soul-update.md",
+      "purpose": "Edit an agent's SOUL.md with a clear before/after diff, citing the new behavior.",
+      "triggers": ["change agent", "update soul", "new behavior", "agent role"],
+      "required_tools": ["git"],
+      "maturity": "stable",
+      "owner": "engineering"
+    },
+    {
+      "name": "memory-add-fact",
+      "path": "memory-add-fact.md",
+      "purpose": "Add a fact to the project memory bank. Auto-classifies trust tier.",
+      "triggers": ["remember", "save fact", "store this", "log this"],
+      "required_tools": ["mem0 v3 (optional)", "memory_router.py"],
+      "maturity": "stable",
+      "owner": "research"
+    },
+    {
+      "name": "memory-recall",
+      "path": "memory-recall.md",
+      "purpose": "Query the memory bank. Falls back to JSONL scan if no vector backend.",
+      "triggers": ["recall", "what did we", "do you remember", "find past"],
+      "required_tools": ["memory_router.py"],
+      "maturity": "stable",
+      "owner": "research"
+    }
+  ]
+}

@@ -5,7 +5,8 @@ import type {
   RolePayload, RoleMapping,
   SkillItem, AgentSkillAssignment, AgentSkillPayload,
   AgentProposal, AgentProposalRequest, RemovedAgent, Workspace,
-  ArmyRun, ArmyRunRequest, ArmyWorker
+  ArmyRun, ArmyRunRequest, ArmyWorker,
+  Topology, TopologyNode, TopologyAgent, TopologyEdge
 } from '../types/dashboard';
 
 const API = CONFIG.API_BASE;
@@ -112,4 +113,6 @@ export const api = {
   rejectArmyRun: (runId: string, reason: string) => post<{ run: ArmyRun; writes_profile_configs: false }>(`/army/runs/${runId}/reject`, { reason }),
   rerunArmyRun: (runId: string) => post<{ run: ArmyRun; writes_profile_configs: false }>(`/army/runs/${runId}/rerun`, {}),
   approveArmyRun: (runId: string) => post<{ run: ArmyRun; merged: false; writes_profile_configs: false }>(`/army/runs/${runId}/approve`, {}),
+  // D-2026-06-08-topology-editor sub-phase 2: read-only topology view
+  fetchTopology: (companyId: string) => get<Topology>(`/companies/${companyId}/topology`),
 };

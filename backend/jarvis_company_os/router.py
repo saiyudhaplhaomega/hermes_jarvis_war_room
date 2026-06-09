@@ -39,7 +39,7 @@ def create_company(payload: dict):
     cid = payload.get("id") or f"co-{uuid.uuid4().hex[:8]}"
     try:
         import sqlite3
-        conn = sqlite3.connect(str(registry.KANBAN_DB_PATH), timeout=5.0)
+        conn = sqlite3.connect(str(registry._resolve_paths()[0]), timeout=5.0)
         try:
             conn.execute(
                 """INSERT INTO companies
@@ -77,15 +77,30 @@ def add_edge(payload: dict):
                             detail="type must be reports_to or collaborates_with")
     eid = payload.get("id") or str(uuid.uuid4())
     company_id = payload.get("company_id", "jarvis-war-room")
+    from_agent = payload["from_agent"]
+    to_agent = payload["to_agent"]
+
+    # D-2026-06-08 sub-phase 3: cycle prevention on reports_to.
+    # Reject self-loops and any path that would close a cycle.
+    if payload["type"] == "reports_to":
+        if _edge_would_form_cycle(company_id, from_agent, to_agent):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"reports_to edge {from_agent!r} -> {to_agent!r} would "
+                    f"form a cycle in the org hierarchy"
+                ),
+            )
+
     try:
         import sqlite3
-        conn = sqlite3.connect(str(registry.KANBAN_DB_PATH), timeout=5.0)
+        conn = sqlite3.connect(str(registry._resolve_paths()[0]), timeout=5.0)
         try:
             conn.execute(
                 """INSERT INTO edges (id, company_id, type, from_agent, to_agent)
                    VALUES (?, ?, ?, ?, ?)""",
                 (eid, company_id, payload["type"],
-                 payload["from_agent"], payload["to_agent"]),
+                 from_agent, to_agent),
             )
             conn.execute(
                 """INSERT INTO audit_log (id, ts, actor, action, target, detail_json)
@@ -93,8 +108,8 @@ def add_edge(payload: dict):
                            ?, ?)""",
                 (str(uuid.uuid4()), eid,
                  f'{{"type":"{payload["type"]}",'
-                 f'"from":"{payload["from_agent"]}",'
-                 f'"to":"{payload["to_agent"]}"}}'),
+                 f'"from":"{from_agent}",'
+                 f'"to":"{to_agent}"}}'),
             )
             conn.commit()
             return {"id": eid, "status": "created"}
@@ -104,29 +119,70 @@ def add_edge(payload: dict):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+def _edge_would_form_cycle(company_id: str, from_agent: str, to_agent: str) -> bool:
+    """Return True if adding `from_agent -> to_agent` (reports_to) would
+    create a cycle in the org hierarchy. Used by add_edge() to enforce
+    the tree property.
+
+    Algorithm (per codex design 2026-06-08):
+      1. Self-loop is always a cycle.
+      2. Build the reports_to graph from existing edges.
+      3. DFS from to_agent. If we can reach from_agent, the new edge
+         would close a cycle.
+    """
+    if from_agent == to_agent:
+        return True
+    import sqlite3
+    from collections import defaultdict
+    graph: dict = defaultdict(list)
+    db_path, _ = registry._resolve_paths()
+    with sqlite3.connect(str(db_path), timeout=5.0) as conn:
+        rows = conn.execute(
+            """SELECT from_agent, to_agent FROM edges
+               WHERE company_id = ? AND type = 'reports_to'""",
+            (company_id,),
+        ).fetchall()
+    for src, dst in rows:
+        graph[src].append(dst)
+    visited = set()
+
+    def dfs(agent: str) -> bool:
+        if agent == from_agent:
+            return True
+        if agent in visited:
+            return False
+        visited.add(agent)
+        for nxt in graph.get(agent, []):
+            if dfs(nxt):
+                return True
+        return False
+
+    return dfs(to_agent)
+
+
 @router.delete("/edges/{edge_id}")
 def delete_edge(edge_id: str):
+    import sqlite3
+    db_path, _ = registry._resolve_paths()
+    conn = sqlite3.connect(str(db_path), timeout=5.0)
     try:
-        import sqlite3
-        conn = sqlite3.connect(str(registry.KANBAN_DB_PATH), timeout=5.0)
-        try:
-            cur = conn.execute("DELETE FROM edges WHERE id = ?", (edge_id,))
-            conn.commit()
-            if cur.rowcount == 0:
-                raise HTTPException(status_code=404, detail="edge not found")
-            conn.execute(
-                """INSERT INTO audit_log (id, ts, actor, action, target, detail_json)
-                   VALUES (?, datetime('now'), 'jarvis-company-os', 'edge.remove', ?, '{}')""",
-                (str(uuid.uuid4()), edge_id),
-            )
-            conn.commit()
-            return {"id": edge_id, "status": "removed"}
-        finally:
-            conn.close()
+        cur = conn.execute("DELETE FROM edges WHERE id = ?", (edge_id,))
+        if cur.rowcount == 0:
+            # Nothing to delete — return 404 BEFORE committing the audit log
+            raise HTTPException(status_code=404, detail="edge not found")
+        conn.execute(
+            """INSERT INTO audit_log (id, ts, actor, action, target, detail_json)
+               VALUES (?, datetime('now'), 'jarvis-company-os', 'edge.remove', ?, '{}')""",
+            (str(uuid.uuid4()), edge_id),
+        )
+        conn.commit()
+        return {"id": edge_id, "status": "removed"}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        conn.close()
 
 
 @router.post("/admin/apply-migrations")
@@ -200,7 +256,7 @@ def post_message(payload: dict):
 def inbox(agent_id: str = Query(...), limit: int = 50):
     """List messages addressed to this agent, newest first."""
     import sqlite3
-    conn = sqlite3.connect(str(registry.KANBAN_DB_PATH), timeout=5.0)
+    conn = sqlite3.connect(str(registry._resolve_paths()[0]), timeout=5.0)
     conn.row_factory = sqlite3.Row
     try:
         cur = conn.execute(
@@ -232,7 +288,7 @@ def inbox(agent_id: str = Query(...), limit: int = 50):
 def messages_audit(limit: int = 100):
     """Audit log feed for council/dashboard inspection."""
     import sqlite3, json
-    conn = sqlite3.connect(str(registry.KANBAN_DB_PATH), timeout=5.0)
+    conn = sqlite3.connect(str(registry._resolve_paths()[0]), timeout=5.0)
     conn.row_factory = sqlite3.Row
     try:
         cur = conn.execute(
@@ -299,7 +355,7 @@ def wake_agent(agent_id: str):
 def wake_status(agent_id: str):
     """Read current wake_lock state for an agent + node liveness."""
     import sqlite3
-    conn = sqlite3.connect(str(registry.KANBAN_DB_PATH), timeout=5.0)
+    conn = sqlite3.connect(str(registry._resolve_paths()[0]), timeout=5.0)
     conn.row_factory = sqlite3.Row
     try:
         row = conn.execute(
@@ -328,7 +384,7 @@ def admin_generate_agent_files():
 def get_agent_files(agent_id: str):
     """Read back the generated 4 files for an agent (Phase 3 verification)."""
     import sqlite3
-    conn = sqlite3.connect(str(registry.KANBAN_DB_PATH), timeout=5.0)
+    conn = sqlite3.connect(str(registry._resolve_paths()[0]), timeout=5.0)
     conn.row_factory = sqlite3.Row
     try:
         row = conn.execute(
@@ -403,7 +459,7 @@ def reject_hire(hire_id: str, payload: dict = None):
 def list_issues(state: str = None, assignee: str = None, type: str = None,
                 company_id: str = "jarvis-war-room", limit: int = 100):
     import sqlite3, json
-    conn = sqlite3.connect(str(registry.KANBAN_DB_PATH), timeout=5.0)
+    conn = sqlite3.connect(str(registry._resolve_paths()[0]), timeout=5.0)
     conn.row_factory = sqlite3.Row
     try:
         where = ["company_id = ?"]
@@ -446,7 +502,7 @@ def list_issues(state: str = None, assignee: str = None, type: str = None,
 @router.post("/issues")
 def create_issue(payload: dict):
     import sqlite3, uuid as _uuid
-    conn = sqlite3.connect(str(registry.KANBAN_DB_PATH), timeout=5.0)
+    conn = sqlite3.connect(str(registry._resolve_paths()[0]), timeout=5.0)
     try:
         iid = payload.get("id") or f"iss-{_uuid.uuid4().hex[:8]}"
         conn.execute(
@@ -477,7 +533,7 @@ def create_issue(payload: dict):
 @router.post("/issues/{issue_id}/comments")
 def post_comment(issue_id: str, payload: dict):
     import sqlite3, uuid as _uuid, json
-    conn = sqlite3.connect(str(registry.KANBAN_DB_PATH), timeout=5.0)
+    conn = sqlite3.connect(str(registry._resolve_paths()[0]), timeout=5.0)
     try:
         cid = str(_uuid.uuid4())
         conn.execute(
@@ -505,7 +561,7 @@ def post_comment(issue_id: str, payload: dict):
 def board_inbox(limit: int = 50):
     """Items needing board attention: pending hires, blocked issues, recent denials."""
     import sqlite3, json
-    conn = sqlite3.connect(str(registry.KANBAN_DB_PATH), timeout=5.0)
+    conn = sqlite3.connect(str(registry._resolve_paths()[0]), timeout=5.0)
     conn.row_factory = sqlite3.Row
     try:
         out = {"pending_hires": [], "blocked_issues": [], "recent_denials": []}
@@ -551,7 +607,7 @@ def budgets_analytics(scope: str = "agent", period: str = "monthly"):
 @router.post("/projects")
 def create_project(payload: dict):
     import sqlite3, uuid as _uuid
-    conn = sqlite3.connect(str(registry.KANBAN_DB_PATH), timeout=5.0)
+    conn = sqlite3.connect(str(registry._resolve_paths()[0]), timeout=5.0)
     try:
         pid = payload.get("id") or f"proj-{_uuid.uuid4().hex[:8]}"
         conn.execute(
@@ -569,7 +625,7 @@ def create_project(payload: dict):
 @router.post("/milestones")
 def create_milestone(payload: dict):
     import sqlite3, uuid as _uuid
-    conn = sqlite3.connect(str(registry.KANBAN_DB_PATH), timeout=5.0)
+    conn = sqlite3.connect(str(registry._resolve_paths()[0]), timeout=5.0)
     try:
         mid = payload.get("id") or f"ms-{_uuid.uuid4().hex[:8]}"
         conn.execute(
@@ -590,7 +646,7 @@ def create_milestone(payload: dict):
 @router.get("/runs")
 def list_runs(agent_id: str = None, status: str = None, limit: int = 50):
     import sqlite3
-    conn = sqlite3.connect(str(registry.KANBAN_DB_PATH), timeout=5.0)
+    conn = sqlite3.connect(str(registry._resolve_paths()[0]), timeout=5.0)
     conn.row_factory = sqlite3.Row
     try:
         where, params = [], []
@@ -615,7 +671,7 @@ def approve_run(run_id: str, payload: dict = None):
     """Spec 01 §4.7: board approves a completed run → marks done, decrements budget."""
     import sqlite3, json
     payload = payload or {}
-    conn = sqlite3.connect(str(registry.KANBAN_DB_PATH), timeout=5.0)
+    conn = sqlite3.connect(str(registry._resolve_paths()[0]), timeout=5.0)
     conn.row_factory = sqlite3.Row
     try:
         run = conn.execute(
@@ -662,7 +718,7 @@ def reject_run(run_id: str, payload: dict = None):
     import sqlite3, json
     payload = payload or {}
     reason = payload.get("reason", "rejected by board")
-    conn = sqlite3.connect(str(registry.KANBAN_DB_PATH), timeout=5.0)
+    conn = sqlite3.connect(str(registry._resolve_paths()[0]), timeout=5.0)
     try:
         conn.execute(
             "UPDATE runs SET status='rejected', reject_reason=? WHERE run_id=?",
