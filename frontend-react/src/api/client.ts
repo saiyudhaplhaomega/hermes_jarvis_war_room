@@ -6,8 +6,11 @@ import type {
   SkillItem, AgentSkillAssignment, AgentSkillPayload,
   AgentProposal, AgentProposalRequest, RemovedAgent, Workspace,
   ArmyRun, ArmyRunRequest, ArmyWorker,
-  Topology, TopologyNode, TopologyAgent, TopologyEdge
+  Topology,
+  CatalogPayload, CatalogSkill
 } from '../types/dashboard';
+
+export type { Topology, TopologyNode, TopologyAgent, TopologyEdge } from '../types/dashboard';
 
 const API = CONFIG.API_BASE;
 const TOKEN = CONFIG.TOKEN;
@@ -115,4 +118,62 @@ export const api = {
   approveArmyRun: (runId: string) => post<{ run: ArmyRun; merged: false; writes_profile_configs: false }>(`/army/runs/${runId}/approve`, {}),
   // D-2026-06-08-topology-editor sub-phase 2: read-only topology view
   fetchTopology: (companyId: string) => get<Topology>(`/companies/${companyId}/topology`),
+  // D-2026-06-09 (Phase 2): skill catalog + per-project assignment
+  catalog: (filters?: { trust_tier?: string; department?: string; category?: string; q?: string }) =>
+    get<CatalogPayload>('/catalog', filters as Record<string, string> | undefined),
+  catalogByDepartment: (department: string) =>
+    get<{ department: string; count: number; skills: CatalogSkill[]; writes_profile_configs: false }>(`/catalog/by-department/${department}`),
+  refreshCatalog: () => post<{ version: number; count: number; skills: CatalogSkill[]; writes_profile_configs: false }>('/catalog/refresh', {}),
+  importSkill: (payload: {
+    name: string;
+    summary: string;
+    description?: string;
+    source_repo?: string;
+    source_path?: string;
+    icon_url?: string;
+    trust_tier?: 'T1' | 'T2' | 'T3';
+    departments?: string[];
+    category?: string;
+  }) => post<{ writes_profile_configs: false; updated: boolean; skill: any; catalog_size: number }>('/skills/import', payload),
+  listImportedSkills: () => get<{ writes_profile_configs: false; count: number; skills: any[] }>('/skills/imports'),
+  removeImportedSkill: async (name: string) => {
+    const url = `${API}/skills/imports/${encodeURIComponent(name)}`;
+    const r = await fetch(url, { method: 'DELETE', headers: authHeaders({}) });
+    if (!r.ok) throw new Error(`DELETE ${url} ${r.status}`);
+    return r.json();
+  },
+  agentSkillsByProject: (agent: string, project: string = 'default') =>
+    get<{ agent: string; project: string; skills: string[]; notes: string; writes_profile_configs: false }>(`/agents/${agent}/skills-by-project`, { project }),
+  saveAgentSkillsByProject: (project: string, agent: string, skills: string[], notes: string = '') =>
+    post<{ agent: string; project: string; skills: string[]; notes: string; writes_profile_configs: false }>('/agents/skills-by-project', { project, agent, skills, notes }),
+  refreshCatalog: () => post<{ version: number; updated_at: string; count: number; writes_profile_configs: false }>('/catalog/refresh', {}),
+
+  // ── Agent Cron Jobs (D-2026-06-14) ────────────────────────────
+  listCronJobs: (params?: { agent?: string; enabled?: boolean }) =>
+    get<{ writes_profile_configs: false; count: number; jobs: any[] }>('/cron/jobs', params as any),
+  getCronJob: (id: string) =>
+    get<any>(`/cron/jobs/${encodeURIComponent(id)}`),
+  createCronJob: (payload: any) =>
+    post<{ writes_profile_configs: false; created: string; job: any }>('/cron/jobs', payload),
+  updateCronJob: async (id: string, updates: any) => {
+    const url = `${API}/cron/jobs/${encodeURIComponent(id)}`;
+    const r = await fetch(url, {
+      method: 'PATCH',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(updates),
+    });
+    if (!r.ok) throw new Error(`PATCH ${url} ${r.status}: ${await r.text()}`);
+    return r.json();
+  },
+  deleteCronJob: async (id: string) => {
+    const url = `${API}/cron/jobs/${encodeURIComponent(id)}`;
+    const r = await fetch(url, { method: 'DELETE', headers: authHeaders({}) });
+    if (!r.ok) throw new Error(`DELETE ${url} ${r.status}`);
+    return r.json();
+  },
+  runCronJobNow: (id: string) =>
+    post<{ writes_profile_configs: false; dispatched: boolean; agent: string; job: any }>(`/cron/jobs/${encodeURIComponent(id)}/run`, {}),
 };
+
+// Backward-compatible named export used by older tests/components.
+export const fetchTopology = api.fetchTopology;

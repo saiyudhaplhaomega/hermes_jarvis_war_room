@@ -8,13 +8,19 @@ export interface CommandPanelLink {
 }
 
 export const COMMAND_PANEL_LINKS: CommandPanelLink[] = [
+  // D-2026-06-14: on mobile (single column), the first two panels in this
+  // list become row 1. Mission Control and Agent Constellation are pinned
+  // to the top so the user always sees system status + agent topology
+  // first, regardless of screen size.
   { id: 'mission-control', label: 'Mission Control', icon: '🎯', description: 'System overview and active metrics' },
-  { id: 'role-matrix', label: 'Agent Growth Studio', icon: '🧩', description: 'Provider/model dropdowns, skill feed, proposals, graveyard' },
   { id: 'agent-constellation', label: 'Agent Constellation', icon: '✨', description: 'Live agent topology and health' },
+  { id: 'role-matrix', label: 'Agent Growth Studio', icon: '🧩', description: 'Provider/model dropdowns, skill feed, proposals, graveyard' },
+  { id: 'skill-marketplace', label: 'Skill Marketplace', icon: '🛒', description: 'Browse 110+ skills, import from GitHub, assign to any agent' },
   { id: 'memory-nexus', label: 'Memory Nexus', icon: '🧠', description: 'Project-scoped memories' },
   { id: 'decision-log', label: 'Decision Log', icon: '📋', description: 'Recorded decisions and gates' },
   { id: 'kanban-fleet', label: 'Kanban Fleet', icon: '📊', description: 'Project-specific tasks and lanes' },
   { id: 'army-operations', label: 'Army Operations', icon: '🛰️', description: 'CLI worker missions, logs, diffs, approve/reject/rerun' },
+  { id: 'cron-jobs', label: 'Agent Cron Jobs', icon: '⏰', description: 'Schedule agents to run on a cron expression, interval, or one-shot timer' },
   { id: 'dispatch-terminal', label: 'Dispatch Terminal', icon: '💬', description: 'Embedded command/chat panel' },
   { id: 'discord-nexus', label: 'Discord Nexus', icon: '🔌', description: 'Discord coordination status' },
   { id: 'council-chamber', label: 'Council Chamber', icon: '🏛️', description: 'Council review and approval gates' },

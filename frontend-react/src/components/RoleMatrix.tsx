@@ -10,6 +10,7 @@ import type {
   SkillItem,
 } from '../types/dashboard';
 import { PanelHeader } from './PanelHeader';
+import { RoleMatrixSkillFeed, RoleMatrixSkillPicker } from './RoleMatrixSkillFeed';
 
 const STATUS_CLASS: Record<RoleMapping['status'], string> = {
   active: 'text-emerald-300 border-emerald-400/40 bg-emerald-400/10',
@@ -347,35 +348,22 @@ export function RoleMatrix() {
           <div className="flex items-center justify-between gap-2 mb-2">
             <div>
               <div className="font-semibold text-gray-100">Skill Feed</div>
-              <div className="text-[11px] text-gray-400">Assign skills to specific agents. Stored as dashboard overlay only.</div>
+              <div className="text-[11px] text-gray-400">Pick an agent, then search and tick the skills you want. Selected skills appear as chips below the input.</div>
             </div>
             <button type="button" className="premium-button" onClick={saveSkills} disabled={savingSkills}>{savingSkills ? 'Saving...' : 'Save skills'}</button>
           </div>
-          <div className="growth-agent-list">
-            {agentNames.slice(0, 12).map(agent => {
-              const selected = assignmentFor(agent).skills;
-              return (
-                <div key={agent} className="growth-agent-card">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-gray-100">{agent}</span>
-                    <span className="mono text-[10px] text-cyan-300">{selected.length} skills</span>
-                  </div>
-                  <div className="skill-chip-grid">
-                    {skills.slice(0, 18).map(skill => (
-                      <label key={`${agent}:${skill.name}`} className="skill-chip">
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(skill.name)}
-                          onChange={event => updateAssignment(agent, skill.name, event.target.checked)}
-                        />
-                        <span>{skill.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              );
+          <RoleMatrixSkillFeed
+            agentNames={agentNames}
+            skills={skills}
+            currentAssignments={assignments}
+            onChange={(agent, skills) => setAssignments(prev => {
+              const next = [...prev];
+              const idx = next.findIndex(a => a.agent === agent);
+              if (idx >= 0) next[idx] = { ...next[idx], agent, skills, notes: next[idx].notes || '' };
+              else next.push({ agent, skills, notes: '' });
+              return next;
             })}
-          </div>
+          />
         </section>
 
         <section className="growth-panel">
@@ -397,18 +385,17 @@ export function RoleMatrix() {
                 {modelOptions(proposalDraft.provider).map(model => <option key={model} value={model}>{model}</option>)}
               </select>
               <textarea value={proposalDraft.notes} onChange={event => setProposalField('notes', event.target.value)} placeholder="why this agent should exist" rows={3} />
-              <div className="skill-chip-grid compact">
-                {skills.slice(0, 24).map(skill => (
-                  <label key={`proposal:${skill.name}`} className="skill-chip">
-                    <input
-                      type="checkbox"
-                      checked={proposalDraft.skills.includes(skill.name)}
-                      onChange={event => toggleProposalSkill(skill.name, event.target.checked)}
-                    />
-                    <span>{skill.name}</span>
-                  </label>
-                ))}
-              </div>
+              <RoleMatrixSkillPicker
+                skills={skills}
+                selected={proposalDraft.skills}
+                onToggle={(name, on) => {
+                  setProposalDraftField('skills', on
+                    ? Array.from(new Set([...(proposalDraft.skills || []), name]))
+                    : (proposalDraft.skills || []).filter(n => n !== name));
+                }}
+                placeholder={`Search ${skills.length} skills to add to the new agent…`}
+                emptyMessage="No skills match. Try a different search term."
+              />
               <button type="button" className="premium-button" onClick={proposeAgent} disabled={proposing || !proposalDraft.agent_name || !proposalDraft.provider || !proposalDraft.model}>
                 {proposing ? 'Proposing...' : 'Propose agent'}
               </button>

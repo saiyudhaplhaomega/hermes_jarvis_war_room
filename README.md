@@ -4,6 +4,23 @@ Hermes/Jarvis War Room dashboard snapshot.
 
 This repository preserves the current War Room implementation so the dashboard, React UI, Agent Growth Studio, command menu, skill-assignment overlay, backend APIs, docs, tests, and service definitions are recoverable after a server crash.
 
+## Quick start (one-click)
+
+Double-click **`Jarvis War Room.bat`** (or run `python jarvis_war_room.py`) to launch the dashboard as a desktop app. The launcher will:
+- kill any stale processes on ports 8502 / 8503
+- start the FastAPI backend (`uvicorn`) on :8502
+- start the Vite preview server on :8503
+- read `.env.local` for the dev token + control secret
+- open `http://127.0.0.1:8503/` in your default browser
+- show a Tk window with live log + Start / Stop / Restart buttons
+
+Close the window or press `Stop` to shut everything down cleanly.
+
+Other invocations:
+- `python jarvis_war_room.py --headless` — same servers, no GUI window (good for CI / scheduled tasks)
+- `python jarvis_war_room.py --no-browser` — start servers, don't auto-open the browser
+- `./jarvis.sh` (git-bash) — same as the .bat launcher
+
 ## What is included
 
 - `frontend-react/` — React War Room UI.
@@ -51,15 +68,22 @@ The intended deployment shape is:
 ```bash
 cd hermes_jarvis_war_room
 
-python3 -m venv venv
-source venv/bin/activate
-python -m pip install -r backend/requirements.txt
-python -m pip install -r backend/requirements-dev.txt
+# Portable path, including Hermes-on-Windows/MSYS where python3 or pip may be stubs.
+uv venv .venv --python 3.11
+uv pip install --python .venv/Scripts/python.exe -r backend/requirements.txt -r backend/requirements-dev.txt
 
 cd frontend-react
 npm install
 npm run build
 cd ..
+```
+
+If you are on Linux/macOS or WSL and already have a normal Python toolchain, the equivalent is:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+python -m pip install -r backend/requirements.txt -r backend/requirements-dev.txt
 ```
 
 Create local runtime env:
