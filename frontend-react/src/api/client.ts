@@ -173,6 +173,33 @@ export const api = {
   },
   runCronJobNow: (id: string) =>
     post<{ writes_profile_configs: false; dispatched: boolean; agent: string; job: any }>(`/cron/jobs/${encodeURIComponent(id)}/run`, {}),
+
+  // ── MCP Catalog (D-2026-06-15) ─────────────────────────────
+  listMCPs: () => get<{ writes_profile_configs: false; storage: string; count: number; mcps: any[] }>('/mcp/catalog'),
+  getMCP: (name: string) => get<any>(`/mcp/catalog/${encodeURIComponent(name)}`),
+  addMCP: (payload: any) =>
+    post<{ writes_profile_configs: false; count: number; mcps: any[] }>('/mcp/catalog/add', payload),
+  removeMCP: async (name: string) => {
+    const url = `${API}/mcp/catalog/${encodeURIComponent(name)}`;
+    const r = await fetch(url, { method: 'DELETE', headers: authHeaders({}) });
+    if (!r.ok) throw new Error(`DELETE ${url} ${r.status}`);
+    return r.json();
+  },
+  refreshMCPCatalog: () =>
+    post<{ writes_profile_configs: false; count: number; mcps: any[] }>('/mcp/catalog/refresh', {}),
+  detectChatIntent: (text: string) =>
+    post<{ is_mcp_intent: boolean; confidence: number; reason: string; extracted: any }>('/mcp/chat-intent', { text }),
+  installMCPFromChat: (text: string, scope: string = 'global-hermes', assign_to: string[] = []) =>
+    post<{
+      writes_profile_configs: false;
+      detected_kind: string;
+      detected_name: string;
+      detected_url: string;
+      catalog_size: number;
+      mcp: any;
+      confirmation: string;
+      run_suggested_command: string;
+    }>('/mcp/install-from-chat', { text, scope, assign_to }),
 };
 
 // Backward-compatible named export used by older tests/components.

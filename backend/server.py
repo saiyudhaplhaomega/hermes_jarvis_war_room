@@ -45,6 +45,7 @@ from api.agent_growth import (
     REMOVED_AGENTS_FILE,
 )
 from api.agent_cron import router as agent_cron_router, JOBS_FILE as AGENT_CRON_JOBS_FILE
+from api.mcp_catalog import router as mcp_catalog_router, CATALOG_FILE as MCP_CATALOG_FILE
 from api.army import router as army_router
 from jarvis_company_os.router import router as jarvis_company_os_router
 from jarvis_company_os.migrations import apply_pending
@@ -397,6 +398,7 @@ def _check_json_state_paths() -> dict:
         "removed_agents": REMOVED_AGENTS_FILE,
         "role_mappings": ROLE_FILE,
         "agent_cron_jobs": AGENT_CRON_JOBS_FILE,
+        "mcp_catalog": MCP_CATALOG_FILE,
         "ledger": Path("kanban.db"),  # r52
     }
     return {name: _probe_json_state_path(name, path) for name, path in paths.items()}
@@ -436,6 +438,7 @@ plugin.include_router(project_router)
 plugin.include_router(roles_router)
 plugin.include_router(agent_growth_router)
 plugin.include_router(agent_cron_router)  # D-2026-06-14 (Agent Cron Jobs)
+plugin.include_router(mcp_catalog_router)  # D-2026-06-15 (MCP Catalog + chat install)
 plugin.include_router(army_router)
 plugin.include_router(jarvis_company_os_router)  # JARVIS-SPEC-PACKAGE-INTEGRATION Phase 1
 app.include_router(plugin)

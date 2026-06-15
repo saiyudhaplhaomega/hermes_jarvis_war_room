@@ -16,6 +16,7 @@ export const COMMAND_PANEL_LINKS: CommandPanelLink[] = [
   { id: 'agent-constellation', label: 'Agent Constellation', icon: '✨', description: 'Live agent topology and health' },
   { id: 'role-matrix', label: 'Agent Growth Studio', icon: '🧩', description: 'Provider/model dropdowns, skill feed, proposals, graveyard' },
   { id: 'skill-marketplace', label: 'Skill Marketplace', icon: '🛒', description: 'Browse 110+ skills, import from GitHub, assign to any agent' },
+  { id: 'mcp-marketplace', label: 'MCP Marketplace', icon: '🔌', description: 'Register Model Context Protocol servers. Paste a URL or say "add the X MCP" in chat' },
   { id: 'memory-nexus', label: 'Memory Nexus', icon: '🧠', description: 'Project-scoped memories' },
   { id: 'decision-log', label: 'Decision Log', icon: '📋', description: 'Recorded decisions and gates' },
   { id: 'kanban-fleet', label: 'Kanban Fleet', icon: '📊', description: 'Project-specific tasks and lanes' },

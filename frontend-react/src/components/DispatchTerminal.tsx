@@ -3,6 +3,7 @@ import { useChat } from '../contexts/ChatContext';
 import { useProject } from '../contexts/ProjectContext';
 import { useDashboard } from '../contexts/DashboardContext';
 import { PanelHeader } from './PanelHeader';
+import { api } from '../api/client';
 
 interface Props {
   fullPage?: boolean;
@@ -40,24 +41,24 @@ export default function DispatchTerminal({ fullPage }: Props) {
     }
   }, [state.messages.length, state.sending]);
 
-  const focusInput = (delay = 0) => {
+  const focusInput = React.useCallback((delay = 0) => {
     window.setTimeout(() => {
       const el = textareaRef.current;
       if (!el) return;
       el.focus({ preventScroll: true });
     }, delay);
-  };
+  }, []);
 
   React.useEffect(() => {
     if (fullPage) focusInput(0);
-  }, [fullPage]);
+  }, [focusInput, fullPage]);
 
   React.useEffect(() => {
     if (!state.sending && stickyFocusRef.current) {
       focusInput(0);
       focusInput(50);
     }
-  }, [state.sending]);
+  }, [focusInput, state.sending]);
 
   const shouldAllowBlur = (nextTarget: EventTarget | null) => {
     if (!nextTarget || !(nextTarget instanceof HTMLElement)) return false;
@@ -70,17 +71,53 @@ export default function DispatchTerminal({ fullPage }: Props) {
     focusInput(0);
   };
 
-  const sendNow = async (msg: string) => {
+  const sendNow = React.useCallback(async (msg: string) => {
     setLastErr('');
     setQueueNotice('');
     stickyFocusRef.current = true;
+    // D-2026-06-15: chat-driven MCP install. If the user message looks
+    // like "add the X MCP" or is a GitHub/webpage URL, intercept it,
+    // call the MCP install endpoint, and show a confirmation card
+    // IN the chat (not the LLM) — saves tokens and gets instant feedback.
+    try {
+      const intent = await api.detectChatIntent(msg);
+      if (intent.is_mcp_intent && intent.confidence >= 0.6) {
+        try {
+          const result = await api.installMCPFromChat(
+            msg, 'global-hermes', state.agent ? [state.agent] : []
+          );
+          // Inject a synthetic assistant-style message into the chat
+          // stream so the user sees the confirmation inline.
+          const note = `✅ **Added MCP: ${result.mcp.name}**\n\n` +
+            `- Source: \`${result.detected_kind}\` → ${result.detected_url || '(no URL)'}\n` +
+            `- Install command: \`${result.run_suggested_command || '(fill in manually)'}\`\n` +
+            `- Catalog size: ${result.catalog_size}\n\n` +
+            `To actually install on your machine, run:\n\`\`\`\n${result.run_suggested_command || '# no command — set install_command in the catalog'}\n\`\`\``;
+          // Use the chat context's push mechanism if available
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('jarvis-mcp-installed', {
+              detail: { mcp: result.mcp, confirmation: result.confirmation }
+            }));
+          }
+          // Fall back to setQueueNotice to surface a hint
+          setQueueNotice(`✅ Added MCP "${result.mcp.name}" — see MCP Marketplace panel.`);
+        } catch (mcpErr: any) {
+          setLastErr(`MCP install failed: ${mcpErr?.message || mcpErr}`);
+        }
+        focusInput(0);
+        focusInput(50);
+        return; // Do NOT forward to the LLM
+      }
+    } catch (e) {
+      // Intent endpoint down — fall through to LLM
+    }
     try {
       await sendMessage(msg, project?.slug, state.agent);
     } finally {
       focusInput(0);
       focusInput(50);
     }
-  };
+  }, [focusInput, project?.slug, sendMessage, state.agent]);
 
   React.useEffect(() => {
     if (state.sending) return;
@@ -91,7 +128,7 @@ export default function DispatchTerminal({ fullPage }: Props) {
     window.setTimeout(() => {
       void sendNow(queued);
     }, 0);
-  }, [state.sending]);
+  }, [sendNow, state.sending]);
 
   const handleSend = async () => {
     const msg = text.trim();

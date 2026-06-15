@@ -18,12 +18,14 @@ import { DiscordNexus } from "./DiscordNexus";
 import { CouncilChamber } from "./CouncilChamber";
 import { GitHubWorkspace } from "./GitHubWorkspace";
 import { SkillMarketplace } from "./SkillMarketplace";
+import { MCPMarketplace } from "./MCPMarketplace";
 import { AgentCronJobs } from "./AgentCronJobs";
 
 const panelMap: Record<string, React.FC | React.ComponentType> = {
   "mission-control": MissionControlOverview,
   "role-matrix": RoleMatrix,
   "skill-marketplace": SkillMarketplace,
+  "mcp-marketplace": MCPMarketplace,
   "agent-constellation": AgentConstellation,
   "memory-nexus": MemoryNexus,
   "decision-log": DecisionLog,

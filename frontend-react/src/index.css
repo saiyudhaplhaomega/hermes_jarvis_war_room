@@ -433,8 +433,20 @@ body {
 .panel-collapsed .panel-collapse-icon {
   transform: rotate(-90deg);
 }
+.role-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: auto;
+}
 .role-table th,
-.role-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.06); text-align: left; }
+.role-table td {
+  padding: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  text-align: left;
+  min-width: 0; /* allow cells to shrink */
+  vertical-align: top;
+}
+.role-table th { white-space: nowrap; }
 .dashboard-layout {
   display: grid;
   gap: 18px;
@@ -464,9 +476,11 @@ body {
   .dashboard-panel-grid .wide-panel { grid-column: auto; }
 }
 .role-table select,
-.role-table input {
+.role-table input,
+.role-table textarea {
   width: 100%;
-  min-width: 130px;
+  min-width: 0;
+  max-width: 100%;
   border-radius: 8px;
   border: 1px solid rgba(255,255,255,0.1);
   background: rgba(15,23,42,0.9);
@@ -516,10 +530,97 @@ body {
   color: #fff;
   outline: none;
 }
+/* ── Agent Growth Studio (D-2026-06-14 Bootstrap-style) ──────────
+   Flat 3-section row that never overflows its parent card:
+   - row-of-sections: 1 col on mobile, 2 on md, 3 on lg+
+   - growth-section: min-w-0 so children can shrink
+   - growth-section-sticky-cta: Add Agent CTA stays at top
+*/
+.row-of-sections {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+@media (min-width: 768px) {
+  .row-of-sections { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1280px) {
+  .row-of-sections { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.9fr); }
+}
+.growth-section {
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  background: rgba(15,23,42,0.42);
+  padding: 12px;
+  min-width: 0; /* CRITICAL: lets flex/grid children shrink */
+  overflow: hidden; /* prevent bleed-out from the panel */
+  display: flex;
+  flex-direction: column;
+}
+.growth-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.growth-section-title {
+  font-weight: 600;
+  color: #e5e7eb;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.growth-section-sub {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+  line-height: 1.4;
+  /* truncate to 2 lines so it never breaks layout */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.growth-section-sticky-cta {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -12px -12px 10px -12px;
+  padding: 12px 12px 10px 12px;
+  background: linear-gradient(180deg, rgba(15,23,42,0.95) 70%, rgba(15,23,42,0.6) 100%);
+  border-bottom: 1px solid rgba(168,85,247,0.18);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.growth-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.growth-form-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Legacy .agent-growth-grid kept as fallback for any external
+   reference, but no longer used in the active layout. */
 .agent-growth-grid {
   display: grid;
-  grid-template-columns: minmax(360px, 1.25fr) minmax(320px, .9fr) minmax(300px, .75fr);
+  grid-template-columns: 1fr;
   gap: 14px;
+}
+@media (min-width: 1024px) {
+  .agent-growth-grid { grid-template-columns: 1fr; }
 }
 .growth-panel,
 .growth-agent-card,
@@ -529,6 +630,7 @@ body {
   border-radius: 16px;
   background: rgba(15,23,42,0.42);
   padding: 12px;
+  min-width: 0;
 }
 .growth-agent-list {
   display: grid;
@@ -915,6 +1017,27 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--jarvis-text-dim, #6b7280);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.skill-mkt-scope-hint {
+  font-size: 0.65rem;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--jarvis-text-dim, #94a3b8);
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.skill-mkt-scope-select {
+  /* Inherits the standard select styling; flag for future theming. */
+  cursor: pointer;
 }
 
 .skill-mkt-control select,
@@ -1375,8 +1498,258 @@ body {
 }
 .skill-mkt-imported-del:hover { background: rgba(248, 113, 113, 0.3); }
 
+/* ── MCP Marketplace (D-2026-06-15) ────────────────────────────── */
+.mcp-marketplace,
+[data-testid="mcp-marketplace"] {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.mcp-url-import {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  background: rgba(6, 182, 212, 0.06);
+  border: 1px dashed rgba(6, 182, 212, 0.3);
+  border-radius: 10px;
+}
+.mcp-url-import-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #67e8f9;
+  font-weight: 600;
+}
+.mcp-url-import input {
+  flex: 1 1 200px;
+  min-width: 200px;
+  background: rgba(15, 23, 42, 0.9);
+  color: #e5e7eb;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  outline: none;
+}
+.mcp-url-import input:focus { border-color: rgba(34, 211, 238, 0.6); }
+.mcp-url-import-status {
+  font-size: 11px;
+  color: #94a3b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.mcp-chat-confirm {
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  background: rgba(34, 197, 94, 0.06);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.mcp-chat-confirm-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+.mcp-chat-confirm-icon { font-size: 16px; }
+.mcp-chat-confirm-kind {
+  font-size: 10px;
+  color: #94a3b8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 1px 6px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 4px;
+}
+.mcp-chat-confirm-body {
+  font-size: 11px;
+  color: #cbd5e1;
+  white-space: pre-wrap;
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(0,0,0,0.2);
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.mcp-install-cmd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  border-radius: 8px;
+  margin-top: 4px;
+}
+.mcp-install-cmd-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #67e8f9;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.mcp-install-cmd code {
+  font-size: 12px;
+  color: #fcd34d;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 2px 6px;
+  border-radius: 4px;
+  user-select: all;
+  word-break: break-all;
+}
+.mcp-assigned-agents {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: #c4b5fd;
+  margin-top: 4px;
+}
+.skill-mkt-error {
+  background: rgba(248, 113, 113, 0.15);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #fca5a5;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.skill-mkt-save-status {
+  font-size: 11px;
+  color: #67e8f9;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 2px 0;
+}
+.skill-mkt-card {
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(15,23,42,0.5);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.skill-mkt-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.skill-mkt-card-body { min-width: 0; }
+.skill-mkt-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.skill-mkt-card-meta {
+  font-size: 10px;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.skill-mkt-imported-notes {
+  font-size: 11px;
+  color: #94a3b8;
+  font-style: italic;
+}
+
 /* ── Agent Cron Jobs panel (D-2026-06-14) ──────────────────────── */
-.agent-cron-jobs { display: flex; flex-direction: column; gap: 8px; }
+.agent-cron-jobs { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+/* D-2026-06-14: 3-level scope filter (All / Global Hermes / Jarvis War Room / active project) */
+.cron-scope-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 4px 0 2px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  margin-bottom: 4px;
+}
+.cron-scope-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #cbd5e1;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  font-family: inherit;
+}
+.cron-scope-pill:hover { background: rgba(255,255,255,0.08); }
+.cron-scope-pill-count {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.3);
+  color: #94a3b8;
+  font-size: 10px;
+  text-align: center;
+  line-height: 1.4;
+}
+.cron-scope-pill--on { color: #fff; }
+.cron-scope-pill--on .cron-scope-pill-count { background: rgba(0,0,0,0.5); color: #fff; }
+.cron-scope-pill--amber.cron-scope-pill--on {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #fcd34d;
+}
+.cron-scope-pill--cyan.cron-scope-pill--on {
+  background: rgba(6, 182, 212, 0.18);
+  border-color: rgba(6, 182, 212, 0.5);
+  color: #67e8f9;
+}
+.cron-scope-pill--violet.cron-scope-pill--on {
+  background: rgba(168, 85, 247, 0.18);
+  border-color: rgba(168, 85, 247, 0.5);
+  color: #d8b4fe;
+}
+/* D-2026-06-14: per-job scope badge (color-coded) */
+.cron-scope-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: #cbd5e1;
+}
+.cron-scope-badge--amber {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+}
+.cron-scope-badge--cyan {
+  background: rgba(6, 182, 212, 0.12);
+  border-color: rgba(6, 182, 212, 0.4);
+  color: #67e8f9;
+}
+.cron-scope-badge--violet {
+  background: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.4);
+  color: #c4b5fd;
+}
+.cron-scope-badge--gray {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.3);
+  color: #94a3b8;
+}
+
 .cron-jobs-toolbar {
   display: flex;
   align-items: center;
