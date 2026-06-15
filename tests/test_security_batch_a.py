@@ -12,15 +12,33 @@ sys.path.insert(0, str(BACKEND))
 sys.path.insert(0, str(ROOT))
 
 
-def _reload_backend(monkeypatch, tmp_path, *, query_fallback="0"):
+def _reload_backend(monkeypatch, tmp_path, *, query_fallback="0", state_overrides=None):
     monkeypatch.setenv("JARVIS_DASHBOARD_DEV_TOKEN", "test-token")
     monkeypatch.setenv("JARVIS_DASHBOARD_QUERY_TOKEN_FALLBACK", query_fallback)
-    monkeypatch.setenv("JARVIS_DASHBOARD_ROLE_MAPPINGS", str(tmp_path / "roles.json"))
+    state_paths = {
+        "JARVIS_DASHBOARD_ROLE_MAPPINGS": "roles.json",
+        "JARVIS_DISCORD_GATEWAY_STATE": "discord_gateway.json",
+        "JARVIS_DASHBOARD_COUNCIL_DECISIONS": "council_decisions.json",
+        "JARVIS_DASHBOARD_AGENT_SKILLS": "agent_skill_assignments.json",
+        "JARVIS_DASHBOARD_SKILL_CATALOG": "skill_catalog.json",
+        "JARVIS_DASHBOARD_AGENT_PROPOSALS": "agent_proposals.json",
+        "JARVIS_DASHBOARD_REMOVED_AGENTS": "removed_agents.json",
+    }
+    for key, filename in state_paths.items():
+        monkeypatch.setenv(key, str(tmp_path / filename))
+    for key, value in (state_overrides or {}).items():
+        monkeypatch.setenv(key, str(value))
     monkeypatch.setenv("JARVIS_DASHBOARD_ARMY_STATE", str(tmp_path / "army_state.json"))
     monkeypatch.setenv("JARVIS_DASHBOARD_ARMY_RUNS", str(tmp_path / "army_runs"))
     monkeypatch.setenv("JARVIS_DASHBOARD_ARMY_DISABLE_EXEC", "1")
     for name in list(sys.modules):
-        if name == "server" or name.startswith("auth.") or name.startswith("core.websocket"):
+        if (
+            name == "server"
+            or name.startswith("auth.")
+            or name == "core.config"
+            or name.startswith("core.websocket")
+            or name in {"api.discord_gateway", "api.council", "api.agent_growth", "api.roles"}
+        ):
             sys.modules.pop(name, None)
     import server
     return server
@@ -78,7 +96,39 @@ def test_auth_session_sets_httponly_cookie_and_ready_endpoint_exists(monkeypatch
 
     ready = client.get("/api/plugins/jarvis-dashboard/v1/ready", headers={"Authorization": "Bearer test-token"})
     assert ready.status_code == 200
-    assert ready.json()["status"] == "ready"
+    body = ready.json()
+    assert body["status"] == "ready"
+    assert set(body["state_paths"]) == {
+        "gateway",
+        "council",
+        "agent_growth_assignments",
+        "catalog",
+        "proposals",
+        "removed_agents",
+        "role_mappings",
+    }
+    assert all(item["writable"] is True for item in body["state_paths"].values())
+    assert "test-token" not in ready.text
+
+
+def test_ready_reports_unwritable_json_state_path(monkeypatch, tmp_path):
+    blocked_parent = tmp_path / "blocked-parent"
+    blocked_parent.write_text("not a directory")
+    server = _reload_backend(
+        monkeypatch,
+        tmp_path,
+        query_fallback="0",
+        state_overrides={"JARVIS_DISCORD_GATEWAY_STATE": blocked_parent / "discord_gateway.json"},
+    )
+    client = TestClient(server.app)
+
+    ready = client.get("/api/plugins/jarvis-dashboard/v1/ready", headers={"Authorization": "Bearer test-token"})
+
+    assert ready.status_code == 200
+    body = ready.json()
+    assert body["status"] == "degraded"
+    assert body["state_paths"]["gateway"]["writable"] is False
+    assert "path" not in body["state_paths"]["gateway"]
     assert "test-token" not in ready.text
 
 

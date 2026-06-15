@@ -12,14 +12,24 @@ import secrets
 from fastapi import Request, HTTPException, WebSocketException, status
 from typing import Optional
 
-DEV_TOKEN = os.environ.get("JARVIS_DASHBOARD_DEV_TOKEN", "")
-DEV_USER = os.environ.get("JARVIS_DASHBOARD_DEV_USER", "saiyudh")
 SESSION_COOKIE_NAME = "jarvis-dashboard-token"
-QUERY_TOKEN_FALLBACK = os.environ.get("JARVIS_DASHBOARD_QUERY_TOKEN_FALLBACK", "0").lower() in {"1", "true", "yes", "on"}
+
+
+def _dev_token() -> str:
+    return os.environ.get("JARVIS_DASHBOARD_DEV_TOKEN", "")
+
+
+def _dev_user() -> str:
+    return os.environ.get("JARVIS_DASHBOARD_DEV_USER", "saiyudh")
+
+
+def _query_token_fallback() -> bool:
+    return os.environ.get("JARVIS_DASHBOARD_QUERY_TOKEN_FALLBACK", "0").lower() in {"1", "true", "yes", "on"}
 
 
 def _is_dev_token(token: Optional[str]) -> bool:
-    return bool(token and DEV_TOKEN and secrets.compare_digest(token, DEV_TOKEN))
+    dev_token = _dev_token()
+    return bool(token and dev_token and secrets.compare_digest(token, dev_token))
 
 
 def _bearer_token(authorization: Optional[str]) -> Optional[str]:
@@ -33,7 +43,7 @@ def _bearer_token(authorization: Optional[str]) -> Optional[str]:
 
 def _decode_subject(token: Optional[str]) -> Optional[str]:
     if _is_dev_token(token):
-        return DEV_USER
+        return _dev_user()
     if not token:
         return None
     try:
@@ -54,7 +64,7 @@ def get_current_user(request: Request) -> str:
         _bearer_token(request.headers.get("Authorization")),
         request.cookies.get(SESSION_COOKIE_NAME),
     ]
-    if QUERY_TOKEN_FALLBACK:
+    if _query_token_fallback():
         candidates.append(request.query_params.get("token"))
 
     for token in candidates:
@@ -86,7 +96,7 @@ def get_current_user_ws(
         _bearer_token(authorization),
         cookie_token,
     ]
-    if QUERY_TOKEN_FALLBACK:
+    if _query_token_fallback():
         candidates.append(query_token)
 
     for token in candidates:

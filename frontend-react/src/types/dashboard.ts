@@ -93,6 +93,55 @@ export interface DashboardCache {
   gateway: Record<string, unknown>;
   projects: Project[];
   sessions: Record<string, unknown>[];
+  // War Room v1.3+ additions (D-2026-06-14 aggregator)
+  research?: ResearchItem[];
+  departments?: Record<string, DepartmentInfo>;
+  topology?: TopologySnapshot;
+  human_gates?: { pending: unknown[]; history: unknown[]; audit_count: number };
+  fact_store?: { facts: FactItem[]; count: number };
+}
+
+export interface ResearchItem {
+  id: string;
+  round_id: string;
+  title: string;
+  source: string;
+  project?: string;
+  kind: string;
+  created_at?: string;
+  size_bytes?: number;
+}
+
+export interface DepartmentInfo {
+  name: string;
+  title: string;
+  file_count: number;
+  files: Array<{
+    path: string;
+    name: string;
+    title: string;
+    kind: string;
+    size_bytes: number;
+    updated_at: string;
+    excerpt: string;
+  }>;
+}
+
+export interface TopologySnapshot {
+  companies: Array<Record<string, unknown>>;
+  teams: Array<Record<string, unknown>>;
+  agents: Array<Record<string, unknown>>;
+  nodes: Array<Record<string, unknown>>;
+  edges: Array<Record<string, unknown>>;
+  budgets: Array<Record<string, unknown>>;
+  audit_log_count?: number;
+}
+
+export interface FactItem {
+  rowid: number;
+  source: string;
+  content: string;
+  created_at?: string;
 }
 
 export interface RoleMapping {
@@ -137,7 +186,41 @@ export interface SkillItem {
   source: string;
 }
 
+// D-2026-06-09 (Phase 2): catalog + per-project skill assignment
+export interface CatalogSkill {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  source_repo: string;
+  source_path: string;
+  trust_tier: 'T0' | 'T1' | 'T2' | 'T3';
+  departments: string[];
+  mcp_servers: string[];
+  review_status: 'curated' | 'bulk' | 'community';
+  provenance: { added_by: string; added_at: string };
+  hash: string;
+}
+
+export interface CatalogSummary {
+  total_skills: number;
+  by_trust_tier: Record<string, number>;
+  by_source: Record<string, number>;
+  by_category: Record<string, number>;
+}
+
+export interface CatalogPayload {
+  version: number;
+  updated_at: string;
+  summary: CatalogSummary;
+  sources: Array<{ repo: string; tier: string; kind: string; license: string; trust_tier: string }>;
+  skills: CatalogSkill[];
+  writes_profile_configs: false;
+}
+
 export interface AgentSkillAssignment {
+  // Phase 2: added `project` for per-project scoping (default "default")
+  project?: string;
   agent: string;
   skills: string[];
   notes: string;

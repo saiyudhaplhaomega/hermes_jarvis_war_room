@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useCallback } from 'react';
 import type { KanbanCard } from '../types/dashboard';
 import { api } from '../api/client';
+import { errorMessage } from '../utils/config';
 
 type State = {
   cards: KanbanCard[];
@@ -45,8 +46,8 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await api.kanban(project);
       dispatch({ type: 'SET', cards: res.tasks || [] });
-    } catch (e: any) {
-      dispatch({ type: 'ERROR', msg: e.message });
+    } catch (e: unknown) {
+      dispatch({ type: 'ERROR', msg: errorMessage(e) });
     }
   }, []);
 
@@ -54,8 +55,8 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
     try {
       await api.heartbeat(taskId, progress);
       dispatch({ type: 'UPDATE_CARD', id: taskId, patch: { last_heartbeat_at: new Date().toISOString() } });
-    } catch (e: any) {
-      dispatch({ type: 'ERROR', msg: e.message });
+    } catch (e: unknown) {
+      dispatch({ type: 'ERROR', msg: errorMessage(e) });
     }
   }, []);
 
@@ -63,8 +64,8 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
     try {
       await api.blockTask(taskId, reason);
       dispatch({ type: 'UPDATE_CARD', id: taskId, patch: { status: 'blocked' } });
-    } catch (e: any) {
-      dispatch({ type: 'ERROR', msg: e.message });
+    } catch (e: unknown) {
+      dispatch({ type: 'ERROR', msg: errorMessage(e) });
     }
   }, []);
 
@@ -72,8 +73,8 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
     try {
       await api.unblockTask(taskId);
       dispatch({ type: 'UPDATE_CARD', id: taskId, patch: { status: 'ready' } });
-    } catch (e: any) {
-      dispatch({ type: 'ERROR', msg: e.message });
+    } catch (e: unknown) {
+      dispatch({ type: 'ERROR', msg: errorMessage(e) });
     }
   }, []);
 
@@ -81,8 +82,8 @@ export function KanbanProvider({ children }: { children: React.ReactNode }) {
     try {
       await api.completeTask(taskId);
       dispatch({ type: 'UPDATE_CARD', id: taskId, patch: { status: 'done' } });
-    } catch (e: any) {
-      dispatch({ type: 'ERROR', msg: e.message });
+    } catch (e: unknown) {
+      dispatch({ type: 'ERROR', msg: errorMessage(e) });
     }
   }, []);
 

@@ -11,6 +11,12 @@ from typing import Any
 
 from .config import *  # noqa
 
+# Project root (one level above the backend package, set by config)
+try:
+    PROJECT_ROOT
+except NameError:
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
 
 class DataAggregator:
     def __init__(self):
@@ -29,6 +35,11 @@ class DataAggregator:
             "gateway": self._scan_gateway(),
             "projects": self._scan_projects(),
             "sessions": self._scan_sessions(),
+            "research": self._scan_research(),
+            "departments": self._scan_departments(),
+            "topology": self._scan_topology(),
+            "human_gates": self._scan_human_gates(),
+            "fact_store": self._scan_fact_store(),
         }
         self.write_cache()
         return self.cache
@@ -55,20 +66,59 @@ class DataAggregator:
                 continue
             if not isinstance(data, dict):
                 continue
-            profile = data.get("profile") or {}
-            model_cfg = data.get("model") or {}
-            name = profile.get("name") or profile_dir.name
-            model = model_cfg.get("default") or model_cfg.get("model") or ""
-            provider = model_cfg.get("provider") or ""
+            # D-2026-06-14: support BOTH the nested profile/model schema and
+            # the flat schema that the actual profiles on disk use
+            # (name: ..., model: codex, role: boss, provider: anthropic, ...).
+            profile_section = data.get("profile") or {}
+            if not isinstance(profile_section, dict):
+                profile_section = {}
+            # The flat schema has these as top-level keys
+            name = (
+                profile_section.get("name")
+                or data.get("name")
+                or profile_dir.name
+            )
+            role = (
+                profile_section.get("role")
+                or data.get("role")
+                or ""
+            )
+            description = (
+                profile_section.get("description")
+                or data.get("description")
+                or ""
+            )
+            status = data.get("status") or ""
+            # model: can be either a string ("codex") or a dict
+            # ({"default": "...", "provider": "..."})
+            model_cfg = data.get("model")
+            if isinstance(model_cfg, str):
+                model_name = model_cfg
+                model_provider = data.get("provider", "") or ""
+            elif isinstance(model_cfg, dict):
+                model_name = (
+                    model_cfg.get("default")
+                    or model_cfg.get("model")
+                    or ""
+                )
+                model_provider = (
+                    model_cfg.get("provider")
+                    or data.get("provider")
+                    or ""
+                )
+            else:
+                model_name = ""
+                model_provider = data.get("provider", "") or ""
             running = (f"--profile {name} gateway" in ps_out) or (name == "jarvis" and "hermes_cli.main gateway run" in ps_out)
             agents.append({
                 "name": name,
                 "tier": 3 if name in ("jarvis-boss", "jarvis-council") else 2 if name != "jarvis" else 1,
-                "status": "running" if running else "configured",
+                "status": "running" if running else (status or "configured"),
                 "last_seen": datetime.now(timezone.utc).isoformat() if running else None,
-                "model": model,
-                "provider": provider,
-                "role": profile.get("description", ""),
+                "model": model_name,
+                "provider": model_provider,
+                "role": role,
+                "description": description,
                 "project": "",
                 "source": str(p),
             })
@@ -341,3 +391,182 @@ class DataAggregator:
             CACHE_FILE.write_text(json.dumps(self.cache, indent=2, default=str))
         except Exception:
             pass
+
+    # ───────────────────────────────────────────────
+    # War Room v1.3+ scanners — surface the agents'
+    # actual research, decisions, topology, and infra
+    # state in the dashboard cache.
+    # ───────────────────────────────────────────────
+
+    def _scan_research(self):
+        """Scan the project-root research directory for agent-produced docs.
+
+        These are the artifacts the agents (jarvis-* leads, scouts, council)
+        produced during previous sprints. Each becomes a 'memory' item the
+        dashboard can surface.
+        """
+        research = []
+        candidates = [
+            PROJECT_ROOT / "docs" / "research",
+            PROJECT_ROOT / "research",
+            PROJECT_ROOT / "decisions",
+        ]
+        for root in candidates:
+            if not root.exists():
+                continue
+            for p in sorted(root.glob("*.md")):
+                # Skip prompt/input files, only include actual deliverables
+                name = p.name
+                if name.startswith("_") or "_input" in name or "_prompt" in name:
+                    continue
+                text = ""
+                try:
+                    text = p.read_text(errors="ignore")[:4000]
+                except Exception:
+                    pass
+                # Project detection by substring
+                project = ""
+                proj_root = HOME / ".hermes" / "memory" / "projects"
+                if proj_root.exists():
+                    for proj_dir in proj_root.iterdir():
+                        if proj_dir.is_dir() and proj_dir.name in text:
+                            project = proj_dir.name
+                            break
+                # Round id from filename (e.g. r01-codebase-audit.md)
+                round_id = ""
+                m = re.match(r"^(r\d+|c\d+-r\d+|D-\d+-\d+-\d+)", name)
+                if m:
+                    round_id = m.group(1)
+                research.append({
+                    "id": name,
+                    "round_id": round_id,
+                    "title": self._first_heading(p) or name,
+                    "source": str(p),
+                    "project": project,
+                    "kind": p.parent.name,
+                    "created_at": self._file_timestamp(p),
+                    "size_bytes": p.stat().st_size,
+                })
+        return research
+
+    def _scan_departments(self):
+        """Scan the per-department docs under docs/departments/<name>/.
+
+        These contain agent operating notes per department (engineering,
+        product, marketing, etc.) — the kind of context a council member
+        needs to do tier-2/3 reviews.
+        """
+        departments = {}
+        depts_root = PROJECT_ROOT / "docs" / "departments"
+        if not depts_root.exists():
+            return departments
+        for dept_dir in sorted(depts_root.iterdir()):
+            if not dept_dir.is_dir():
+                continue
+            files = []
+            for p in sorted(dept_dir.glob("**/*.md")):
+                rel = p.relative_to(dept_dir)
+                text = ""
+                try:
+                    text = p.read_text(errors="ignore")[:3000]
+                except Exception:
+                    pass
+                files.append({
+                    "path": str(p.relative_to(PROJECT_ROOT)),
+                    "name": p.name,
+                    "title": self._first_heading(p) or p.stem,
+                    "kind": rel.parent.as_posix() if rel.parent != Path(".") else "root",
+                    "size_bytes": p.stat().st_size,
+                    "updated_at": self._file_timestamp(p),
+                    "excerpt": text[:400].replace("\n", " ").strip(),
+                })
+            if files:
+                readme = dept_dir / "README.md"
+                departments[dept_dir.name] = {
+                    "name": dept_dir.name,
+                    "title": self._first_heading(readme) if readme.exists() else dept_dir.name.title(),
+                    "file_count": len(files),
+                    "files": files,
+                }
+        return departments
+
+    def _scan_topology(self):
+        """Read kanban.db for the full company OS topology: companies, teams,
+        agents, nodes, edges, budgets. Surfaces the org chart on the
+        Agent Constellation panel.
+        """
+        if not KANBAN_DB.exists():
+            return {}
+        try:
+            conn = sqlite3.connect(str(KANBAN_DB), timeout=5.0)
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            out: dict[str, Any] = {}
+            for table in ("companies", "teams", "agents", "nodes", "edges", "budgets"):
+                try:
+                    cur.execute(f"SELECT * FROM {table}")
+                    rows = [dict(r) for r in cur.fetchall()]
+                except Exception:
+                    rows = []
+                out[table] = rows
+            try:
+                cur.execute("SELECT COUNT(*) FROM audit_log")
+                out["audit_log_count"] = cur.fetchone()[0]
+            except Exception:
+                out["audit_log_count"] = 0
+            conn.close()
+            return out
+        except Exception:
+            return {}
+
+    def _scan_human_gates(self):
+        """Surface the human-in-the-loop gates DB so the Council Chamber
+        panel can show pending approvals.
+        """
+        db = DASHBOARD_DATA / "human_gates.db"
+        if not db.exists():
+            return {"pending": [], "history": [], "audit_count": 0}
+        try:
+            conn = sqlite3.connect(str(db), timeout=5.0)
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='human_gates'")
+            if not cur.fetchone():
+                conn.close()
+                return {"pending": [], "history": [], "audit_count": 0}
+            cur.execute("SELECT * FROM human_gates ORDER BY created_at DESC LIMIT 50")
+            rows = [dict(r) for r in cur.fetchall()]
+            audit_count = 0
+            try:
+                cur.execute("SELECT COUNT(*) FROM audit_log")
+                audit_count = cur.fetchone()[0]
+            except Exception:
+                pass
+            conn.close()
+            return {"pending": [g for g in rows if g.get("status") == "pending"], "history": rows, "audit_count": audit_count}
+        except Exception:
+            return {"pending": [], "history": [], "audit_count": 0}
+
+    def _scan_fact_store(self):
+        """Surface the FTS-backed fact store so the Memory Nexus panel can
+        show agent-recorded facts.
+        """
+        db = DASHBOARD_DATA / "fact_store.db"
+        if not db.exists():
+            return {"facts": [], "count": 0}
+        try:
+            conn = sqlite3.connect(str(db), timeout=5.0)
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='facts'")
+            if not cur.fetchone():
+                conn.close()
+                return {"facts": [], "count": 0}
+            cur.execute("SELECT rowid, source, content, created_at FROM facts ORDER BY rowid DESC LIMIT 100")
+            rows = [dict(r) for r in cur.fetchall()]
+            cur.execute("SELECT COUNT(*) FROM facts")
+            total = cur.fetchone()[0]
+            conn.close()
+            return {"facts": rows, "count": total}
+        except Exception:
+            return {"facts": [], "count": 0}

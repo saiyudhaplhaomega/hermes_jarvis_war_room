@@ -4,3 +4,7 @@ pydantic>=2.0
 PyYAML>=6.0
 python-jose[cryptography]>=3.3
 pyotp>=2.9
+# D-2026-06-09 (Phase 6): httpx is used at runtime by the Discord gateway
+# dispatcher and the Ollama/Nemotron model adapters. Previously only a
+# dev dep (for TestClient); now a runtime dep for real HTTP calls.
+httpx>=0.25

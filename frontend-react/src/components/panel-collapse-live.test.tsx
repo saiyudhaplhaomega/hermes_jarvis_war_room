@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { act } from 'react';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { MemoryNexus } from './MemoryNexus';
 import { DecisionLog } from './DecisionLog';
@@ -93,10 +94,12 @@ function makeKanbanCtx() {
   } as any;
 }
 
-function setup(children: React.ReactNode) {
+async function setup(children: React.ReactNode) {
   cleanup();
   const removeCss = applyCss();
-  const utils = render(
+  let utils!: ReturnType<typeof render>;
+  await act(async () => {
+    utils = render(
     <DashboardContext.Provider value={makeDashboardCtx()}>
       <ProjectContext.Provider value={makeProjectCtx()}>
         <KanbanContext.Provider value={makeKanbanCtx()}>
@@ -105,6 +108,8 @@ function setup(children: React.ReactNode) {
       </ProjectContext.Provider>
     </DashboardContext.Provider>
   );
+    await Promise.resolve();
+  });
   return { ...utils, cleanup: () => { removeCss(); cleanup(); } };
 }
 
@@ -124,71 +129,71 @@ function visibleSiblingCount(container: HTMLElement): number {
 }
 
 describe('panel collapse live behavior (scope + shrink)', () => {
-  it('MemoryNexus: hides ALL direct siblings after the header (RED before fix)', () => {
-    const { container } = setup(<MemoryNexus />);
+  it('MemoryNexus: hides ALL direct siblings after the header', async () => {
+    const { container } = await setup(<MemoryNexus />);
     const before = visibleSiblingCount(container);
     const btn = screen.getByRole('button', { name: /collapse panel/i });
-    fireEvent.click(btn);
+    await act(async () => { fireEvent.click(btn); });
     const after = visibleSiblingCount(container);
     expect(before).toBeGreaterThan(1);
     expect(after).toBe(0);
   });
 
-  it('DecisionLog: hides ALL direct siblings after the header (RED before fix)', () => {
-    const { container } = setup(<DecisionLog />);
+  it('DecisionLog: hides ALL direct siblings after the header', async () => {
+    const { container } = await setup(<DecisionLog />);
     const before = visibleSiblingCount(container);
     const btn = screen.getByRole('button', { name: /collapse panel/i });
-    fireEvent.click(btn);
+    await act(async () => { fireEvent.click(btn); });
     const after = visibleSiblingCount(container);
     expect(before).toBeGreaterThan(1);
     expect(after).toBe(0);
   });
 
-  it('CouncilChamber: hides its single sibling (footer is nested inside it)', () => {
-    const { container } = setup(<CouncilChamber />);
+  it('CouncilChamber: hides its single sibling (footer is nested inside it)', async () => {
+    const { container } = await setup(<CouncilChamber />);
     const btn = screen.getByRole('button', { name: /collapse panel/i });
-    fireEvent.click(btn);
+    await act(async () => { fireEvent.click(btn); });
     const after = visibleSiblingCount(container);
     expect(after).toBe(0);
   });
 
-  it('DiscordNexus: hides its single sibling', () => {
-    const { container } = setup(<DiscordNexus />);
+  it('DiscordNexus: hides its single sibling', async () => {
+    const { container } = await setup(<DiscordNexus />);
     const btn = screen.getByRole('button', { name: /collapse panel/i });
-    fireEvent.click(btn);
+    await act(async () => { fireEvent.click(btn); });
     const after = visibleSiblingCount(container);
     expect(after).toBe(0);
   });
 
-  it('GitHubWorkspace: hides its single sibling', () => {
-    const { container } = setup(<GitHubWorkspace />);
+  it('GitHubWorkspace: hides its single sibling', async () => {
+    const { container } = await setup(<GitHubWorkspace />);
     const btn = screen.getByRole('button', { name: /collapse panel/i });
-    fireEvent.click(btn);
+    await act(async () => { fireEvent.click(btn); });
     const after = visibleSiblingCount(container);
     expect(after).toBe(0);
   });
 
-  it('AgentConstellation: hides its single sibling', () => {
-    const { container } = setup(<AgentConstellation />);
+  it('AgentConstellation: hides its single sibling', async () => {
+    const { container } = await setup(<AgentConstellation />);
     const btn = screen.getByRole('button', { name: /collapse panel/i });
-    fireEvent.click(btn);
+    await act(async () => { fireEvent.click(btn); });
     const after = visibleSiblingCount(container);
     expect(after).toBe(0);
   });
 
-  it('KanbanFleet: hides its single sibling', () => {
-    const { container } = setup(<KanbanFleet />);
+  it('KanbanFleet: hides its single sibling', async () => {
+    const { container } = await setup(<KanbanFleet />);
     const btn = screen.getByRole('button', { name: /collapse panel/i });
-    fireEvent.click(btn);
+    await act(async () => { fireEvent.click(btn); });
     const after = visibleSiblingCount(container);
     expect(after).toBe(0);
   });
 
-  it('RoleMatrix: hides ALL 3 direct siblings (RED before fix)', () => {
-    const { container } = setup(<RoleMatrix />);
+  it('RoleMatrix: hides ALL 3 direct siblings', async () => {
+    const { container } = await setup(<RoleMatrix />);
     const before = visibleSiblingCount(container);
     const btn = screen.getByRole('button', { name: /collapse panel/i });
-    fireEvent.click(btn);
+    await act(async () => { fireEvent.click(btn); });
     const after = visibleSiblingCount(container);
     expect(before).toBeGreaterThan(2);
     expect(after).toBe(0);

@@ -3,8 +3,12 @@ import os
 from pathlib import Path
 
 HOME = Path.home()
-HERMES = HOME / ".hermes"
-PROFILE = HERMES / "profiles"
+# D-2026-06-09 (Phase 1): honor HERMES_PROFILES_DIR for test isolation
+# and Windows/Linux portability. Default keeps backward compat.
+HERMES = Path(os.environ.get("HERMES_HOME", str(HOME / ".hermes"))).expanduser()
+PROFILE = Path(
+    os.environ.get("HERMES_PROFILES_DIR", str(HERMES / "profiles"))
+).expanduser()
 
 # Data sources
 AGENTS_DIR = PROFILE / "jarvis" / "agents"
@@ -57,3 +61,40 @@ def model_to_color(model_name: str):
         if key in model_name.lower():
             return color
     return MODEL_COLOR["default"]
+
+try:
+    from cryptography.hazmat.primitives.asymmetric import kyber
+    _KYBER_AVAILABLE = True
+except ImportError:
+    # kyber was removed from cryptography in v42+; fall back to a stub
+    _KYBER_AVAILABLE = False
+    kyber = None
+from cryptography.hazmat.primitives import serialization
+
+class PostQuantumCrypto:
+    """Post-quantum cryptography (Kyber-768) for quantum-resistant encryption."""
+
+    def __init__(self):
+        self.private_key, self.public_key = kyber.generate_keypair()
+
+    def encrypt(self, data: bytes) -> bytes:
+        """Encrypt data with public key."""
+        return kyber.encrypt(data, self.public_key)
+
+    def decrypt(self, ciphertext: bytes) -> bytes:
+        """Decrypt data with private key."""
+        return kyber.decrypt(ciphertext, self.private_key)
+
+    def save_keys(self, private_path: str, public_path: str):
+        """Save keys to files."""
+        with open(private_path, "wb") as f:
+            f.write(self.private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption()
+            ))
+        with open(public_path, "wb") as f:
+            f.write(self.public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            ))

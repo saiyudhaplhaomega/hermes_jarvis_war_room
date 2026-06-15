@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Agent Debate Viewer — Hermes Jarvis War Room</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --ink: #f8fafc;
+      --ink-secondary: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0ea5e9;
+      --danger: #ef4444;
+      --success: #10b981;
+      --border: #334155;
+      --radius: 8px;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 1rem;
+    }
+    
+    .sidebar {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1rem;
+      border: 1px solid var(--border);
+    }
+    
+    .sidebar h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .debate-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .debate-item {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      transition: background 0.2s;
+    }
+    
+    .debate-item:hover {
+      background: var(--border);
+    }
+    
+    .debate-item.active {
+      background: var(--accent);
+      color: var(--ink);
+    }
+    
+    .debate-item .topic {
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    
+    .debate-item .agents {
+      font-size: 0.75rem;
+      color: var(--ink-secondary);
+    }
+    
+    .debate-item .status {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      align-self: flex-start;
+    }
+    
+    .debate-item .status.active { background: var(--success); color: var(--ink); }
+    .debate-item .status.pending { background: var(--border); color: var(--ink-secondary); }
+    
+    .canvas {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1rem;
+      border: 1px solid var(--border);
+      min-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .canvas h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    
+    .debate-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .debate-meta {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.75rem;
+      color: var(--ink-secondary);
+    }
+    
+    .chat-container {
+      flex-grow: 1;
+      overflow-y: auto;
+      margin-bottom: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .message {
+      display: flex;
+      gap: 0.75rem;
+      max-width: 80%;
+    }
+    
+    .message.sent {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+    
+    .message .avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    
+    .message .bubble {
+      padding: 0.75rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    
+    .message.received .avatar {
+      background: var(--accent);
+      color: var(--ink);
+    }
+    
+    .message.received .bubble {
+      background: var(--border);
+      color: var(--ink);
+    }
+    
+    .message.sent .avatar {
+      background: var(--success);
+      color: var(--ink);
+    }
+    
+    .message.sent .bubble {
+      background: var(--accent);
+      color: var(--ink);
+    }
+    
+    .input-area {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .input-area input {
+      flex-grow: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      font-size: 0.875rem;
+      color: var(--ink);
+    }
+    
+    .input-area button {
+      background: var(--accent);
+      color: var(--ink);
+      border: none;
+      border-radius: var(--radius);
+      padding: 0.75rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    
+    .tweaks {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+    }
+    
+    .tweaks label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Sidebar: Debate List -->
+    <div class="sidebar">
+      <h2>Active Debates</h2>
+      <div class="debate-list" id="debateList">
+        <div class="debate-item active" data-debate='{"topic": "Should Hermes Jarvis adopt role-based agents?", "agents": ["Researcher-001", "Engineer-002", "Manager-003"], "status": "active"}'>
+          <div class="topic">Should Hermes Jarvis adopt role-based agents?</div>
+          <div class="agents">Researcher-001, Engineer-002, Manager-003</div>
+          <div class="status active">Active</div>
+        </div>
+        <div class="debate-item" data-debate='{"topic": "Is LangGraph better than CrewAI for orchestration?", "agents": ["Researcher-001", "Analyst-004"], "status": "pending"}'>
+          <div class="topic">Is LangGraph better than CrewAI for orchestration?</div>
+          <div class="agents">Researcher-001, Analyst-004</div>
+          <div class="status pending">Pending</div>
+        </div>
+        <div class="debate-item" data-debate='{"topic": "Should we add a tool marketplace?", "agents": ["Product-005", "Engineer-002"], "status": "active"}'>
+          <div class="topic">Should we add a tool marketplace?</div>
+          <div class="agents">Product-005, Engineer-002</div>
+          <div class="status active">Active</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Canvas: Debate Viewer -->
+    <div class="canvas">
+      <div class="debate-header">
+        <h2 id="debateTopic">Should Hermes Jarvis adopt role-based agents?</h2>
+        <div class="debate-meta">
+          <span id="debateAgents">Agents: Researcher-001, Engineer-002, Manager-003</span>
+          <span id="debateStatus">Status: Active</span>
+        </div>
+      </div>
+      
+      <div class="chat-container" id="chatContainer">
+        <!-- Messages will be added here dynamically -->
+        <div class="message received">
+          <div class="avatar">R</div>
+          <div class="bubble">Role-based agents improve clarity and scalability by assigning explicit roles (Researcher, Writer, Manager) instead of a monolithic prompt. This aligns with CrewAI's approach and reduces context bloat.</div>
+        </div>
+        <div class="message sent">
+          <div class="avatar">E</div>
+          <div class="bubble">While role-based agents are useful, they add complexity to the codebase. We'd need to refactor the agent creation API, update the UI, and ensure backward compatibility. Is the ROI worth it?</div>
+        </div>
+        <div class="message received">
+          <div class="avatar">M</div>
+          <div class="bubble">The ROI is clear: role-based agents enable better task decomposition and collaboration. For example, a Researcher can gather data, a Writer can draft content, and a Manager can coordinate. This mirrors human teams and improves efficiency.</div>
+        </div>
+        <div class="message received">
+          <div class="avatar">R</div>
+          <div class="bubble">Additionally, role-based agents allow for specialization. A Researcher can use tools like Google Search and Web Scraper, while a Writer can use Grammarly and Notion. This reduces the cognitive load on each agent.</div>
+        </div>
+        <div class="message sent">
+          <div class="avatar">E</div>
+          <div class="bubble">I agree with the benefits, but we should prototype this first. Let's create a minimal implementation with 3 roles (Researcher, Writer, Manager) and test it in a controlled environment.</div>
+        </div>
+      </div>
+      
+      <div class="input-area">
+        <input type="text" placeholder="Type your message..." id="messageInput">
+        <button id="sendButton">Send</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tweaks Panel -->
+  <div class="tweaks">
+    <label>
+      <input type="checkbox" id="showAvatars" checked>
+      Show avatars
+    </label>
+    <label>
+      <input type="checkbox" id="showTimestamps" checked>
+      Show timestamps
+    </label>
+  </div>
+
+  <script>
+    // Debate Selection
+    document.querySelectorAll('.debate-item').forEach(item => {
+      item.addEventListener('click', () => {
+        document.querySelectorAll('.debate-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        
+        const debate = JSON.parse(item.dataset.debate);
+        document.getElementById('debateTopic').textContent = debate.topic;
+        document.getElementById('debateAgents').textContent = `Agents: ${debate.agents.join(', ')}`;
+        document.getElementById('debateStatus').textContent = `Status: ${debate.status.charAt(0).toUpperCase() + debate.status.slice(1)}`;
+        
+        // Load debate messages (simplified for demo)
+        const chatContainer = document.getElementById('chatContainer');
+        chatContainer.innerHTML = '';
+        
+        if (debate.topic === "Should Hermes Jarvis adopt role-based agents?") {
+          chatContainer.innerHTML = `
+            <div class="message received">
+              <div class="avatar">R</div>
+              <div class="bubble">Role-based agents improve clarity and scalability by assigning explicit roles (Researcher, Writer, Manager) instead of a monolithic prompt. This aligns with CrewAI's approach and reduces context bloat.</div>
+            </div>
+            <div class="message sent">
+              <div class="avatar">E</div>
+              <div class="bubble">While role-based agents are useful, they add complexity to the codebase. We'd need to refactor the agent creation API, update the UI, and ensure backward compatibility. Is the ROI worth it?</div>
+            </div>
+            <div class="message received">
+              <div class="avatar">M</div>
+              <div class="bubble">The ROI is clear: role-based agents enable better task decomposition and collaboration. For example, a Researcher can gather data, a Writer can draft content, and a Manager can coordinate. This mirrors human teams and improves efficiency.</div>
+            </div>
+            <div class="message received">
+              <div class="avatar">R</div>
+              <div class="bubble">Additionally, role-based agents allow for specialization. A Researcher can use tools like Google Search and Web Scraper, while a Writer can use Grammarly and Notion. This reduces the cognitive load on each agent.</div>
+            </div>
+            <div class="message sent">
+              <div class="avatar">E</div>
+              <div class="bubble">I agree with the benefits, but we should prototype this first. Let's create a minimal implementation with 3 roles (Researcher, Writer, Manager) and test it in a controlled environment.</div>
+            </div>
+          `;
+        } else if (debate.topic === "Is LangGraph better than CrewAI for orchestration?") {
+          chatContainer.innerHTML = `
+            <div class="message received">
+              <div class="avatar">R</div>
+              <div class="bubble">LangGraph offers explicit orchestration patterns (sequential, concurrent, handoff), which are great for complex workflows. It's also backed by LangChain, which has a massive tool ecosystem.</div>
+            </div>
+            <div class="message sent">
+              <div class="avatar">A</div>
+              <div class="bubble">CrewAI, on the other hand, is built for production and prioritizes reliability and observability. Its role-based system is also more intuitive for task decomposition.</div>
+            </div>
+            <div class="message received">
+              <div class="avatar">R</div>
+              <div class="bubble">True, but LangGraph's patterns are more flexible. For example, you can define a graph where Agent A hands off to Agent B only if a condition is met. CrewAI's system is more rigid.</div>
+            </div>
+          `;
+        } else if (debate.topic === "Should we add a tool marketplace?") {
+          chatContainer.innerHTML = `
+            <div class="message received">
+              <div class="avatar">P</div>
+              <div class="bubble">A tool marketplace would allow users to easily extend Hermes Jarvis with new capabilities. This aligns with SuperAGI's plugin architecture and would make the platform more flexible.</div>
+            </div>
+            <div class="message sent">
+              <div class="avatar">E</div>
+              <div class="bubble">While flexibility is important, a marketplace adds complexity. We'd need to implement tool discovery, installation, and versioning. We should also consider security risks (e.g., malicious tools).</div>
+            </div>
+            <div class="message received">
+              <div class="avatar">P</div>
+              <div class="bubble">Security is a valid concern, but we can mitigate it with sandboxing and code reviews. The benefits outweigh the risks: users could install tools like GitHub, Notion, or Slack without waiting for us to implement them.</div>
+            </div>
+          `;
+        }
+      });
+    });
+    
+    // Send Message
+    document.getElementById('sendButton').addEventListener('click', () => {
+      const input = document.getElementById('messageInput');
+      const message = input.value.trim();
+      if (message) {
+        const chatContainer = document.getElementById('chatContainer');
+        const messageElement = document.createElement('div');
+        messageElement.className = 'message sent';
+        messageElement.innerHTML = `
+          <div class="avatar">U</div>
+          <div class="bubble">${message}</div>
+        `;
+        chatContainer.appendChild(messageElement);
+        input.value = '';
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+    });
+    
+    // Tweaks
+    document.getElementById('showAvatars').addEventListener('change', (e) => {
+      document.querySelectorAll('.avatar').forEach(avatar => {
+        avatar.style.display = e.target.checked ? 'flex' : 'none';
+      });
+    });
+    
+    document.getElementById('showTimestamps').addEventListener('change', (e) => {
+      // Toggle timestamps (not implemented in this demo)
+    });
+  </script>
+</body>
+</html>

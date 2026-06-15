@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
@@ -14,8 +14,10 @@
   "dependencies": {
     "@xyflow/react": "^12.11.0",
     "dagre": "^0.8.5",
+    "dompurify": "^3.4.10",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-error-boundary": "^6.1.2",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

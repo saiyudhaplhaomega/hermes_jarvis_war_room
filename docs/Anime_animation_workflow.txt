@@ -1,0 +1,274 @@
+# **Workflow: Fotachu - Creating The Best Anime Animations (ex: fight scene tricks, peaceful animation tricks, camera, lighting, exposure...)**
+
+Hi, I’m **Fotachu**, also known as **AR GUY**. I’m a tech-focused student from Málaga, passionate about **XR/VR/AR, AI image and video generation**, programming, and **anime/manga culture**, especially **One Piece**. I also enjoy prompt engineering, content creation, translation, and exploring beta-testing opportunities in tech and gaming. I’ve been a **Higgsfield CPP** for over a year, I use it daily, and I regularly create mind-blowing animations, cinematic visuals, and AI-driven content with it.
+
+I’m going to share the best workflow for creating anime animations — including fight scene tricks, peaceful animation tricks, camera movement, lighting, exposure, and other details that make scenes feel cinematic and alive.
+
+!this is my channel’s banner
+
+this is my channel’s banner
+
+Here’s a **STEP-BY-STEP guide from A to Z:**
+
+1. Start with a clear visual goal
+
+Before writing anything, decide what the video must communicate: action, mood, style, or a product message. Seedance 2.0 performs best when the prompt has one main subject, one main action, and one clear atmosphere.
+Think in terms of a director, not a keyword list. You should give the model enough structure to create motion and composition.
+
+1. Build the prompt in layers
+
+A strong prompt usually has five layers: SUBJECT, ENVIRONMENT, ACTION, CAMERA, and STYLE. If one of these is missing, the result can feel vague or static.
+
+A useful formula is:
+Subject: who or what is in the scene. (feed Seedance 2.0 with visuals of the person), you can also create any character spreadsheet using this prompt:
+
+`*A high-definition, clean, minimalist character design board / character turnaround reference sheet, set against a pure white background. The overall presentation should resemble a professional game art character modeling sheet, fashion design reference page, character design sheet, or character turnaround board. The layout should be neat and well-organized, with clearly divided information sections, a realistic and premium visual quality, consistent lighting, and strict character consistency throughout. colored*`
+
+`*On the left side of the composition, show the character’s full-body three-view turnaround, occupying the main visual area, including:*`
+
+1. `*Front full-body standing pose*`
+2. `*Left-side full-body standing pose*`
+3. `*Back full-body standing pose*`
+
+`*All three figures must be the exact same character, with identical facial features, hairstyle, clothing, body shape, and height proportions. The standing pose should feel natural, with both arms hanging naturally at the sides. This should be suitable as a character modeling reference. The camera angle should be eye level, with neutral studio lighting, no obstruction, no exaggerated perspective, and no complex background.*`
+
+`*The right side of the composition should be divided into two sections:*`
+
+`*In the upper-right section, place six headshot / head-angle reference images of the same character, arranged neatly to show different head perspectives, including:*`
+
+- `*Front-facing portrait*`
+- `*Slight downward angle showing the top of the head*`
+- `*Back of the head / rear head view*`
+- `*Left-side facial profile*`
+- `*A near-side-angle comparison view (this line was slightly unclear in the source and may not be exact)*`
+- `*3/4 profile portrait*`
+
+`*The head references should have clear facial features, visible hair parting, and consistent facial structure, making them suitable as head design references.*`
+
+`*In the lower-right section, place six close-up detail images of the character, arranged into a clean grid, showing key design details, including:*`
+
+- `*Close-up of the upper garment fabric texture*`
+- `*Front close-up of the lower-body clothing*`
+- `*Close-up of the hip / tailoring detail*`
+- `*Close-up of the leg or skin texture detail*`
+- `*Close-up of the eyes or facial feature details*`
+- `*Full close-up of the shoes as a standalone item*`
+
+`*All detail images must match the main character’s outfit and appearance exactly. Materials should look realistic, and the details should be clean and precise, suitable as clothing and accessory modeling references.*`
+
+`*Overall style requirements:
+Minimalist, professional, realistic, unified, clean, and premium, similar to a character design board, fashion design reference sheet, 3D character modeling reference page, or character turnaround presentation board. The character edges should be sharp, garment shapes should be clearly defined, hair strands should appear natural, skin should look refined, and material rendering should be accurate. The overall layout should have generous white space, as if it were made by a professional concept art team.*`
+
+here’s an output example: ******   
+
+!prompt above.png)
+
+prompt above
+
+**Character setup:**
+
+[Character appearance description] or use the reference spreadsheet you generated (which is better)
+
+**Output requirements:**
+
+Landscape composition, white background, full character visible, no cropping, no extra props, no explanatory text, no logo, no watermark, no UI interface elements, no like/save buttons, and no social-media-screenshot appearance.
+
+**Environment:**
+
+where it happens. (Creating a reference image or multiple using Soul 2.0 or ChatGPT images V2 could also be a great idea)
+
+**ex:** generate an image of a street in New York city, shot on iPhone (no phone visible)
+
+!prompt above.png)
+
+prompt above
+
+**Action:** what changes or moves (You can also ask ChatGPT to generate a detailed storyboard sheet that breaks down every movement and action performed by your character.)
+
+**Camera**: how the viewer sees it (low angle view, high angle view, dolly zoom, pan, tilt…) à You can ask Higgsfield Supercomputer for the best camera shots you could use in your generation.
+
+!the different possible camera angles and perspectives
+
+the different possible camera angles and perspectives
+
+**Style:** the final visual identity (Seedance 2.0 also excels at copying and replicating styles, so you can either prompt it directly to match a specific style or use it to adapt an existing reference.)   
+
+!prompt the style correctly to get more accurate outputs
+
+prompt the style correctly to get more accurate outputs
+
+**Anime Prompt Example:**
+
+**`*2026 animation style anime animation, post time skip. 2d anime glow subtle effect anime animation studios. subtle non precise cartoony. subtle non precise animation style with clean, uniform-weight linework and simple, flat cel-shading. The color palette is soft, muted, and classic animated. The lighting is soft and even, with minimal directional influence from power effects. Gradient shifts are minimized. The overall composition is simplified. Make sure to get characters consistent. Give multiple faces close-ons and different POV shots. NO NSFW, NO COPYRIGHTED Content. NO TEXT, 16:9 video (no black stripes on the borders), NO LOGO(S). RESPECT THE MANGA IMAGE PANELS. DO NOT USE IMAGES ARE STARTING FRAMES, BUT AS STYLES LOOKS.*`**
+
+—> here, you described everything: environment, main character, action (via the reference image(s)), style (2d anime glow effect anime animation etc…), the camera (different POV shots, multiple faces close-ons), the vibe, mood and explicitly ask seedance not to use any “***NSFW, NO COPYRIGHTED Content. NO TEXT, 16:9 video (no black stripes on the borders), NO LOGO(S). RESPECT THE MANGA IMAGE PANELS. DO NOT USE IMAGES ARE STARTING FRAMES, BUT AS STYLES LOOKS.*** )” to respect IP restricted content and policies.    
+
+**3. Control motion carefully**
+
+The biggest difference between a flat clip and a dynamic clip is motion direction. You should specify how the body moves, how the camera moves, and how the environment reacts.
+
+**ex:** `Slow push-in. Fast whip pan. Orbit around the subject.  Handheld energy.  Subtle idle movement.  Wind, smoke, rain, dust, light flicker.  Eye movement, blinking, breathing, hair movement**.` YOU COULD ALSO SPECIFY HOW MANY SHOTS YOU WANNA SEE (ex: generate at least 10 different shots of 10 different perspectives in the first 10s of the video).**
+
+If you want energy, combine a subject action with camera motion. For example, “`The character turns sharply toward the camera while the camera zooms forward slightly`.” That usually feels much more alive than just saying “dynamic.”. You could also ask for specific cinematic effects like `“Dolly-zoom in”, “Low angle view”, “Tilt-up”` etc. **You can also request specific cinematic effects like `“dolly zoom in,” “low angle view,” or “tilt-up.”` To discover more prompts, dynamic hooks, and creative ideas using the Higgsfield model, visit the Higgsfield website. When browsing, avoid selecting the “general” model option; instead, look for the preset effects, where you can sometimes find amazing ones.**
+
+**4. Use style language that matches the goal**
+
+For anime, you can ask for `clean linework, flat cel shading, subtle glow, soft gradients, and consistent character design`. You could also specify the language à across all my generations, the language was always Japanese as I asked for it.
+
+For live action, mention `natural skin texture, realistic depth, cinematic lighting, and lens behavior.`
+
+For products, focus on `clean studio lighting, reflections, material detail, and premium framing.`
+
+**Some useful style directions:**
+
+**UGC:** `lifelike video shot on iPhone, no phone visible, handheld shaky shot, selfie video`
+
+**Sci-fi:** `holographic UI, volumetric light, metallic surfaces, atmospheric particles.`
+
+**Fashion**: `smooth camera motion, elegant pose changes, fabric movement, editorial lighting.`
+
+**5) Keep the subject consistent**
+
+If the same character appears across shots, describe them with stable visual traits every time. Use consistent hair, clothing, age, posture, and expression language. This helps prevent the model from drifting into a different design. You could also use the character’s spreadsheet as mentioned earlier **(use the prompt I shared).**
+
+For anime, **consistency** matters even more. You can say things like:
+
+`“Maintain facial features, hairstyle, and outfit.”`
+
+`“Keep the same character design throughout.”`
+
+`If you want **multiple angles**, ask for them explicitly:`
+
+close-up on the face, side profile, over-the-shoulder view, low-angle shot, wide establishing shot. **OR YOU CAN ALSO ONLY SAY “MULTIPLE SHOTS”** and get random outputs: it’s sometimes better.
+
+!simple prompt : ask for close-up on the face, side profile, over-the-shoulder view, low-angle shot, wide establishing shot
+
+simple prompt : ask for close-up on the face, side profile, over-the-shoulder view, low-angle shot, wide establishing shot
+
+**6) Make scenes feel expensive**
+
+A video feels more professional when the environment reacts to the action. Add small physical details that support realism or style.
+
+**Examples:** `Hair moves with wind. Clothes shift naturally. Light changes across the face. Dust particles float through sunbeams. Background elements stay coherent and stable.`
+
+**7) Adapt the prompt to the genre**
+
+Different genres need different instruction styles.
+
+**For anime**:
+
+Focus on expressive poses, style, clean composition, strong silhouettes, and smooth but subtle movement. Example:
+
+“**`*2026 animation style anime animation, post time skip. 2d anime glow subtle effect anime animation studios. subtle non precise cartoony. subtle non precise animation style with clean, uniform-weight linework and simple, flat cel-shading. The color palette is soft, muted, and classic animated. The lighting is soft and even, with minimal directional influence from power effects. Gradient shifts are minimized. The overall composition is simplified. Make sure to get characters consistent. Give multiple faces close-ons and different POV shots. NO NSFW, NO COPYRIGHTED Content. NO TEXT, 16:9 video (no black stripes on the borders), NO LOGO(S). RESPECT THE MANGA IMAGE PANELS. DO NOT USE IMAGES ARE STARTING FRAMES, BUT AS STYLES LOOKS*`**”
+
+**For live action, realistic videos or UGC:**
+
+Focus on realism, camera behavior, and environment. Example:
+
+“**`*Generate a handheld UGC shot of character from reference image but giant (at least one skyscrapper tall) and doing the moonwalk in a famous city street, destroying every high building. Dynamic composition and intense action, handheld shaky shot.*`**”
+
+**9) Avoid common mistakes**
+
+The most common mistake is overloading the prompt with too many conflicting styles. If you ask for realistic, cartoon, cinematic, toy-like, and watercolor all at once, the result becomes unstable.
+
+**Other mistakes:** Not describing motion. Forgetting the camera. Mixing too many characters in one shot. Asking for too many unrelated actions. Using vague words like “awesome,” “insane,” or “beautiful” without specifics. Changing style mid-prompt. One good prompt is usually better than five messy ones.
+
+but the biggest mistake is asking an AI to generate the prompt for you, as the AI doesn’t prompt like a human, and sometimes results are worse than if you did it by yourself.
+
+**10) Example prompts you can reuse**
+
+**Anime action**
+
+“**`*In an epic sakuga anime animation, generate an unexpected transformation of [character] into [describe].*`**
+
+**`*2026 animation style anime animation, post time skip. professional sound effects and motion, accurate lighting, detailled close-ons. The average time of one shot should be of 2 seconds, maybe you should show around 7 scenes. Background should be [..] (check reference images)*`**
+
+**`*glow subtle effect anime animation studios. subtle non precise cartoony. subtle non precise animation style with clean, uniform-weight linework and simple, flat cel-shading. The color palette is soft, muted, and classic animated. The lighting is soft and even, with minimal directional influence from power effects. Gradient shifts are minimized. The overall composition is simplified. Make sure to get characters consistent.*`**
+
+**`*Give multiple faces close-ons and different POV shots.*`**
+
+**`*NO NSFW, NO COPYRIGHTED CONTENT*`**”
+
+**Realistic cinematic**
+
+“**`*Generate a low resolution really shaky recorded on phone random event that occurs, whether with animals, humans on objects, where you want in the world. The only thing is that it should feel real, even though the event could be totally unreal. The event should be unreal, with a hook and then an even bigger and funnier event occurs. The hook should be a great one*`**”
+
+Here are some examples:
+
+https://d8j0ntlcm91z4.cloudfront.net/user_2v5thGZ3LeID5zCBaaPJeBhaTQr/hf_20260514_170252_3ed2e73a-e155-43b9-988d-bf3b8a25c332.mp4
+
+https://d8j0ntlcm91z4.cloudfront.net/user_2v5thGZ3LeID5zCBaaPJeBhaTQr/hf_20260523_141703_62d38796-014e-48a3-955f-9a6e92ba8740.mp4
+
+**11) A practical workflow in Higgsfield**
+
+Start with a base prompt and generate a first version. Then adjust only one or two things at a time: camera angle, motion intensity, lighting, or style. That makes it easier to understand what works.
+
+**A good workflow is:**
+
+**First pass:** test composition and motion.
+
+**Second pass:** improve camera or pacing.
+
+**Third pass:** refine style and consistency.
+
+**Final pass:** polish the strongest result.
+
+This is much faster than rewriting everything from scratch every time.
+
+*For example, here’s the first output of a video I made.*   
+
+https://d8j0ntlcm91z4.cloudfront.net/user_2v5thGZ3LeID5zCBaaPJeBhaTQr/hf_20260523_081643_3276b3d3-7eb7-4b13-a181-c2128d6e12e9.mp4
+
+Here’s the prompt:
+
+**`generate a handheld UGC shot of character from reference image but giant (at least one skyscrapper tall) and doing the moonwalk in a famous city street, destroying every high building. Dynamic composition and intense action, handheld shaky shot.`**
+
+*And here’s the second output, with a remixed prompt adapted and updated:*   
+
+https://d8j0ntlcm91z4.cloudfront.net/user_2v5thGZ3LeID5zCBaaPJeBhaTQr/hf_20260523_091753_874db598-ff91-4b83-860d-3bd1c9ec1d9e.mp4
+
+Here’s the prompt: **`generate a handheld UGC shot of character from reference image but giant (at least one skyscraper tall) and doing the moonwalk in a famous city street, destroying every high building.`**
+
+**`Dynamic composition and intense action, handheld shaky shot. He should be dancing then kicking the buildings as he dances.`**
+
+**`Continuous low-angle view scene recorded from a citizen. Character acts like Michael Jackson. Dynamic music. Make sure to get character, design, look and exposure correct. Detailed realism, lifelike video recorded on iPhone.`**
+
+**12) Best prompt formula**
+
+**SUBJECT + ACTION + ENVIRONMENT + CAMERA MOUVMENT + VISUAL STYLE + IMPORTANT CONSTRAINTS**
+
+**13) Final pro advice**
+
+The best Seedance 2.0 prompts are specific, visual, and organized around motion. Treat every generation like a shot from a film, not just an image with movement added.
+
+If you want better results, think like this: **What is the subject? What changes in the scene? Where is the camera? What style should the viewer feel? What should stay consistent?**
+
+That mindset gives you much stronger videos across anime, ads, cinematic scenes, fantasy, and realistic content.
+
+**Here are some wild outputs that I generated, using only reference images and a prompt:**
+
+https://d8j0ntlcm91z4.cloudfront.net/user_2v5thGZ3LeID5zCBaaPJeBhaTQr/hf_20260501_164758_90f73e8e-e854-4354-9ab5-37c7d85269af.mp4
+
+https://d8j0ntlcm91z4.cloudfront.net/user_2v5thGZ3LeID5zCBaaPJeBhaTQr/hf_20260501_073521_50b4049f-4a7e-47d3-abf0-681a744a6497.mp4
+
+https://d8j0ntlcm91z4.cloudfront.net/user_2v5thGZ3LeID5zCBaaPJeBhaTQr/hf_20260501_121341_89849bdc-0300-4bd9-a903-225a198daf04.mp4
+
+https://d8j0ntlcm91z4.cloudfront.net/user_2v5thGZ3LeID5zCBaaPJeBhaTQr/hf_20260501_072804_8e5dd50a-f255-43a4-a17a-2938f26784ce.mp4
+
+THANK YOU for reading this workflow all the way to the end. I really hope these tips help you create even better anime animations.
+
+If you’d like to collaborate, ask questions, share your work, or just chat about AI and animation, feel free to contact me at: **fotachuinfo@gmail.com**
+
+You can also follow me on these accounts:
+
+**X / Twitter: @fotachuARGUY ( https://x.com/@fotachuARGUY )**
+
+**Discord: foatacrack_31748** 
+
+**Youtube: @FotachuOff ( https://youtube.com/@fotachuOff )**
+
+**Tiktok: @Fotachu_Off ( https://tiktok.com/@fotachu_Off )**
+
+I can’t wait to see what you create ❤️
+
+And thank you to Higgsfield for putting up with me for over a year now! I hope it continues this way

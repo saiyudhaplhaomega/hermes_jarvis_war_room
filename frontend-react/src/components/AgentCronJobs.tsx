@@ -2,6 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { useProject } from '../contexts/ProjectContext';
 import { PanelHeader } from './PanelHeader';
+import {
+  PROJECT_SCOPES,
+  SCOPE_DEFINITIONS,
+  scopeColor,
+  scopeLabel,
+} from '../utils/projectScopes';
 
 // D-2026-06-14 (Agent Cron Jobs):
 // Lets the user create / list / edit / delete scheduled jobs that
@@ -9,6 +15,22 @@ import { PanelHeader } from './PanelHeader';
 //   - cron       (5-field POSIX expression, e.g. "*/5 * * * *")
 //   - interval   (every N seconds, 1-2592000 = up to 30 days)
 //   - one_shot   (run once at an ISO 8601 UTC timestamp, then auto-disable)
+//
+// D-2026-06-14 (3-level scopes):
+// Every job is scoped to one of three project levels:
+//   1. global-hermes     - top-level Hermes folder. Applies to the
+//                          whole installation. New GitHub repo
+//                          imports land here by default.
+//   2. jarvis-war-room   - the War Room workspace itself (dashboard,
+//                          launcher, council, research).
+//   3. <active-project>  - the chat-active user project (e.g.
+//                          hello-world). Whatever the user picked
+//                          in the chat project picker.
+//
+// The toolbar at the top has a "Scope" segmented control so the
+// user can filter to All / Global Hermes / Jarvis War Room / the
+// current project. The form's "Project" field is a select with
+// the 3 fixed options + a "Custom…" escape hatch.
 //
 // Jobs persist in `agent_cron_jobs.json` (dashboard-local). The SPA's
 // scheduler loop (in `useCronScheduler`) checks every 10s which jobs
@@ -73,7 +95,7 @@ function sortAgents(agents: string[]): string[] {
   });
 }
 
-function emptyDraft(): Partial<CronJob> {
+function emptyDraft(projectSlug: string = PROJECT_SCOPES.DEFAULT): Partial<CronJob> {
   return {
     name: '',
     agent: '',
@@ -82,7 +104,10 @@ function emptyDraft(): Partial<CronJob> {
     cron_expression: '*/15 * * * *',
     interval_seconds: 900,
     run_at: new Date(Date.now() + 60_000).toISOString().slice(0, 19) + 'Z',
-    project: 'default',
+    // D-2026-06-14: caller passes the active project slug. The form's
+    // project select then lets the user switch to global-hermes or
+    // jarvis-war-room (or a custom slug).
+    project: projectSlug,
     enabled: true,
     notes: '',
   };
@@ -90,16 +115,20 @@ function emptyDraft(): Partial<CronJob> {
 
 export function AgentCronJobs() {
   const { project } = useProject();
-  const activeProject = project?.slug || 'default';
+  const activeProject = project?.slug || PROJECT_SCOPES.DEFAULT;
 
   const [jobs, setJobs] = useState<CronJob[]>([]);
   const [agents, setAgents] = useState<string[]>([]);
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Partial<CronJob>>(emptyDraft());
+  const [draft, setDraft] = useState<Partial<CronJob>>(emptyDraft(activeProject));
   const [status, setStatus] = useState<string>('');
   const [showForm, setShowForm] = useState(false);
+  // D-2026-06-14: scope filter (All / Global Hermes / Jarvis War Room / active project)
+  const [scopeFilter, setScopeFilter] = useState<string>('all');
+  // "Custom project" input (when the form's project select is on "custom…")
+  const [customProject, setCustomProject] = useState<string>('');
 
   // ── Load jobs + agent list ────────────────────────────────────
   async function refresh() {
@@ -127,7 +156,7 @@ export function AgentCronJobs() {
   // ── Form handlers ─────────────────────────────────────────────
   function startCreate() {
     setEditingId(null);
-    setDraft({ ...emptyDraft(), agent: agents[0] || '' });
+    setDraft({ ...emptyDraft(activeProject), agent: agents[0] || '' });
     setShowForm(true);
     setStatus('');
   }
@@ -142,7 +171,7 @@ export function AgentCronJobs() {
   function cancelForm() {
     setShowForm(false);
     setEditingId(null);
-    setDraft(emptyDraft());
+    setDraft(emptyDraft(activeProject));
     setStatus('');
   }
 
@@ -229,6 +258,20 @@ export function AgentCronJobs() {
       .slice(0, 5);
   }, [jobs]);
 
+  // ── Derived: scope counts + filtered jobs (D-2026-06-14) ──────
+  const scopeCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: jobs.length };
+    counts[PROJECT_SCOPES.GLOBAL_HERMES] = jobs.filter((j) => (j.project || '') === PROJECT_SCOPES.GLOBAL_HERMES).length;
+    counts[PROJECT_SCOPES.JARVIS_WAR_ROOM] = jobs.filter((j) => (j.project || '') === PROJECT_SCOPES.JARVIS_WAR_ROOM).length;
+    counts[activeProject] = jobs.filter((j) => (j.project || '') === activeProject).length;
+    return counts;
+  }, [jobs, activeProject]);
+
+  const filteredJobs = useMemo(() => {
+    if (scopeFilter === 'all') return jobs;
+    return jobs.filter((j) => (j.project || '') === scopeFilter);
+  }, [jobs, scopeFilter]);
+
   return (
     <div className="dashboard-card agent-cron-jobs" data-testid="agent-cron-jobs">
       <PanelHeader
@@ -236,6 +279,62 @@ export function AgentCronJobs() {
         subtitle={`${jobs.length} job${jobs.length === 1 ? '' : 's'} · ${jobs.filter((j) => j.enabled).length} enabled · schedules run in the dashboard session`}
         accent="amber"
       />
+
+      {/* D-2026-06-14: 3-level scope filter.
+          - "All"            → show every job regardless of project
+          - 🌍 "Global Hermes"→ top-level Hermes folder (war-room-wide + install-wide)
+          - ⚔ "Jarvis War Room" → war-room itself
+          - 📁 activeProject  → only jobs for the current chat project
+          Each button shows a live count badge. */}
+      <div className="cron-scope-filter" data-testid="cron-scope-filter" role="tablist" aria-label="Filter jobs by project scope">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={scopeFilter === 'all'}
+          className={`cron-scope-pill ${scopeFilter === 'all' ? 'cron-scope-pill--on' : ''}`}
+          onClick={() => setScopeFilter('all')}
+          data-testid="cron-scope-all"
+        >
+          <span>All</span>
+          <span className="cron-scope-pill-count">{scopeCounts.all}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={scopeFilter === PROJECT_SCOPES.GLOBAL_HERMES}
+          className={`cron-scope-pill ${scopeFilter === PROJECT_SCOPES.GLOBAL_HERMES ? 'cron-scope-pill--on cron-scope-pill--amber' : ''}`}
+          onClick={() => setScopeFilter(PROJECT_SCOPES.GLOBAL_HERMES)}
+          data-testid="cron-scope-global"
+          title={SCOPE_DEFINITIONS[0].description}
+        >
+          <span>🌍 Global Hermes</span>
+          <span className="cron-scope-pill-count">{scopeCounts[PROJECT_SCOPES.GLOBAL_HERMES]}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={scopeFilter === PROJECT_SCOPES.JARVIS_WAR_ROOM}
+          className={`cron-scope-pill ${scopeFilter === PROJECT_SCOPES.JARVIS_WAR_ROOM ? 'cron-scope-pill--on cron-scope-pill--cyan' : ''}`}
+          onClick={() => setScopeFilter(PROJECT_SCOPES.JARVIS_WAR_ROOM)}
+          data-testid="cron-scope-warroom"
+          title={SCOPE_DEFINITIONS[1].description}
+        >
+          <span>⚔ Jarvis War Room</span>
+          <span className="cron-scope-pill-count">{scopeCounts[PROJECT_SCOPES.JARVIS_WAR_ROOM]}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={scopeFilter === activeProject}
+          className={`cron-scope-pill ${scopeFilter === activeProject ? 'cron-scope-pill--on cron-scope-pill--violet' : ''}`}
+          onClick={() => setScopeFilter(activeProject)}
+          data-testid="cron-scope-active-project"
+          title={`Only jobs for the current chat project (${activeProject})`}
+        >
+          <span>📁 {activeProject}</span>
+          <span className="cron-scope-pill-count">{scopeCounts[activeProject] ?? 0}</span>
+        </button>
+      </div>
 
       <div className="cron-jobs-toolbar">
         <button
@@ -255,7 +354,11 @@ export function AgentCronJobs() {
           ↻ Refresh
         </button>
         <span className="cron-jobs-meta" data-testid="cron-jobs-count">
-          {loading ? 'loading…' : `${jobs.length} job${jobs.length === 1 ? '' : 's'}`}
+          {loading
+            ? 'loading…'
+            : scopeFilter === 'all'
+              ? `${jobs.length} job${jobs.length === 1 ? '' : 's'}`
+              : `${filteredJobs.length} of ${jobs.length} in this scope`}
         </span>
       </div>
 
@@ -361,13 +464,59 @@ export function AgentCronJobs() {
               </label>
             )}
             <label className="cron-field">
-              <span>Project</span>
-              <input
-                type="text"
-                value={draft.project || 'default'}
-                onChange={(e) => setDraft({ ...draft, project: e.target.value })}
+              <span>Project scope <span className="cron-req">*</span></span>
+              {/* D-2026-06-14: select with the 3 fixed levels + custom.
+                  Default is the active chat project. Switching to
+                  global-hermes or jarvis-war-room routes the job to
+                  that scope regardless of what the chat project is. */}
+              <select
+                value={
+                  draft.project === PROJECT_SCOPES.GLOBAL_HERMES
+                  || draft.project === PROJECT_SCOPES.JARVIS_WAR_ROOM
+                  || (draft.project && scopeCounts[draft.project] !== undefined && draft.project === activeProject)
+                    ? draft.project
+                    : '__custom__'
+                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === '__custom__') {
+                    setDraft({ ...draft, project: customProject || '' });
+                  } else {
+                    setDraft({ ...draft, project: v });
+                  }
+                }}
                 data-testid="cron-form-project"
-              />
+              >
+                <option value={activeProject}>📁 {activeProject} (active project)</option>
+                <option value={PROJECT_SCOPES.JARVIS_WAR_ROOM}>⚔ Jarvis War Room (war-room-wide)</option>
+                <option value={PROJECT_SCOPES.GLOBAL_HERMES}>🌍 Global Hermes (installation-wide)</option>
+                <option value="__custom__">Custom…</option>
+              </select>
+              {!(
+                draft.project === PROJECT_SCOPES.GLOBAL_HERMES
+                || draft.project === PROJECT_SCOPES.JARVIS_WAR_ROOM
+                || draft.project === activeProject
+              ) && (
+                <input
+                  type="text"
+                  placeholder="custom project slug"
+                  value={customProject || draft.project || ''}
+                  onChange={(e) => {
+                    setCustomProject(e.target.value);
+                    setDraft({ ...draft, project: e.target.value });
+                  }}
+                  data-testid="cron-form-project-custom"
+                />
+              )}
+              <span className="cron-field-hint">
+                {draft.project === PROJECT_SCOPES.GLOBAL_HERMES
+                  ? '🌍 Installs at the Hermes top level. Applies to the whole Hermes instance, not any one project.'
+                  : draft.project === PROJECT_SCOPES.JARVIS_WAR_ROOM
+                    ? '⚔ Scoped to the Jarvis War Room workspace itself (dashboard, launcher, council, research).'
+                    : draft.project === activeProject
+                      ? `📁 Scoped to the current chat project: ${activeProject}.`
+                      : 'Custom project slug (free-form).'}
+              </span>
             </label>
             <label className="cron-field cron-field--checkbox">
               <input
@@ -417,14 +566,22 @@ export function AgentCronJobs() {
         <div className="cron-error" data-testid="cron-jobs-error">{error}</div>
       )}
 
-      {/* ── JOB LIST ──────────────────────────────────────────── */}
+      {/* ── JOB LIST (D-2026-06-14: scoped via filteredJobs) ────── */}
       <div className="cron-list" data-testid="cron-jobs-list">
         {jobs.length === 0 && !loading && (
           <div className="cron-empty" data-testid="cron-jobs-empty">
             No cron jobs yet. Click <b>+ New job</b> to schedule an agent.
           </div>
         )}
-        {jobs.map((j) => (
+        {jobs.length > 0 && filteredJobs.length === 0 && !loading && (
+          <div className="cron-empty" data-testid="cron-scope-empty">
+            No jobs in this scope ({scopeFilter}). Switch to <b>All</b> to see all {jobs.length} job{jobs.length === 1 ? '' : 's'}.
+          </div>
+        )}
+        {filteredJobs.map((j) => {
+          const color = scopeColor(j.project || '');
+          const scopeClass = `cron-scope-badge cron-scope-badge--${color}`;
+          return (
           <div
             key={j.id}
             className={`cron-row ${j.enabled ? '' : 'cron-row--disabled'}`}
@@ -436,7 +593,19 @@ export function AgentCronJobs() {
                 {j.schedule_type}
               </span>
               <span className="pill pill-default">{j.agent}</span>
-              {j.project && <span className="pill pill-default">📁 {j.project}</span>}
+              {/* D-2026-06-14: color-coded scope badge */}
+              {j.project && (
+                <span
+                  className={scopeClass}
+                  data-testid={`cron-row-scope-${j.name}`}
+                  title={SCOPE_DEFINITIONS.find((d) => d.slug === j.project)?.description || `Project: ${j.project}`}
+                >
+                  {j.project === PROJECT_SCOPES.GLOBAL_HERMES && '🌍 '}
+                  {j.project === PROJECT_SCOPES.JARVIS_WAR_ROOM && '⚔ '}
+                  {j.project && j.project !== PROJECT_SCOPES.GLOBAL_HERMES && j.project !== PROJECT_SCOPES.JARVIS_WAR_ROOM && '📁 '}
+                  {scopeLabel(j.project)}
+                </span>
+              )}
               <span className="cron-row-sched">{describeSchedule(j)}</span>
             </div>
             <div className="cron-row-prompt" data-testid={`cron-row-prompt-${j.name}`}>
@@ -487,7 +656,8 @@ export function AgentCronJobs() {
             </div>
             {j.notes && <div className="cron-row-notes">📝 {j.notes}</div>}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {upcoming.length > 0 && (

@@ -79,7 +79,7 @@ class CanvasErrorBoundary extends Component<
   }
 }
 
-function layoutWithDagre(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
+function layoutWithDagre(nodes: Node<AgentNodeData>[], edges: Edge[]): { nodes: Node<AgentNodeData>[]; edges: Edge[] } {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
   g.setGraph({ rankdir: 'TB', nodesep: 40, ranksep: 60 });
@@ -116,7 +116,7 @@ function shapeTopology(topo: Topology): { nodes: Node<AgentNodeData>[]; edges: E
   const edges: Edge[] = topo.edges
     .filter((e) => e.from_agent && e.to_agent)
     .map((e) => ({
-      id: e.id,
+      id: e.id ?? `${e.from_agent}->${e.to_agent}:${e.type}`,
       source: e.from_agent!,
       target: e.to_agent!,
       label: e.type,
@@ -229,6 +229,13 @@ export function TopologyEditor({ companyId }: { companyId: string }) {
           </ReactFlow>
         </ReactFlowProvider>
       </CanvasErrorBoundary>
+      <div className="sr-only" aria-label="Topology edge list">
+        {edges.map((e) => (
+          <span key={e.id} data-testid={`topology-edge-${e.id}`}>
+            {e.source} to {e.target} ({String(e.label ?? '')})
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

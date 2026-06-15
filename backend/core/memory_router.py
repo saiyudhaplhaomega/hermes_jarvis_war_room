@@ -325,3 +325,32 @@ class MemoryRouter:
     @classmethod
     def _count_jsonl(cls, path: Path) -> int:
         return sum(1 for _ in cls._read_jsonl(path))
+
+class HandoffManager:
+    """Manages cross-department task handoffs with policy checks."""
+
+    def __init__(self, project_id: str):
+        self.project_id = project_id
+        self.handoffs = self._load_handoffs()
+
+    def _load_handoffs(self) -> Dict[str, Dict[str, Any]]:
+        """Load handoff policies from environment variables."""
+        return {
+            "engineering→product": {
+                "allowed": os.getenv("HANDOFF_ENGINEERING_PRODUCT", "true").lower() == "true",
+                "max_handoffs": int(os.getenv("HANDOFF_ENGINEERING_PRODUCT_MAX", "3"))
+            },
+            "product→marketing": {
+                "allowed": os.getenv("HANDOFF_PRODUCT_MARKETING", "true").lower() == "true",
+                "max_handoffs": int(os.getenv("HANDOFF_PRODUCT_MARKETING_MAX", "1"))
+            }
+        }
+
+    def transfer(self, from_dept: str, to_dept: str, task_id: str) -> bool:
+        """Transfer task between departments if policy allows."""
+        policy = self.handoffs.get(f"{from_dept}→{to_dept}")
+        if not policy or not policy["allowed"]:
+            return False
+        # Log handoff (e.g., to audit.py)
+        log_action("system", "handoff", f"{from_dept}→{to_dept}", {"task_id": task_id})
+        return True

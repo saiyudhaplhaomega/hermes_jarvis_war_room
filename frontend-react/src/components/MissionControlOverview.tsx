@@ -49,6 +49,10 @@ export function MissionControlOverview() {
   const agents = cache?.agents || [];
   const decisions = cache?.decisions || [];
   const memory = cache?.memory || {};
+  const research = cache?.research || [];
+  const departments = cache?.departments || {};
+  const topology = cache?.topology || {};
+  const humanGates = cache?.human_gates || { pending: [], audit_count: 0 };
   const projectCards = useMemo(() => {
     if (!cache || !project) return [];
     return cache.kanban_by_project?.[project.slug] || [];
@@ -56,6 +60,11 @@ export function MissionControlOverview() {
   const runningAgents = agents.filter(agent => ['online', 'active', 'running'].includes((agent.status || '').toLowerCase())).length;
   const blockedCards = projectCards.filter(card => card.status === 'blocked' || card.blocked_by_parents).length;
   const activeProject = project?.slug || 'no-project-selected';
+  const deptCount = Object.keys(departments).length;
+  const deptFileCount = Object.values(departments).reduce((sum, d) => sum + d.file_count, 0);
+  const topologyAgents = topology.agents?.length || 0;
+  const topologyEdges = topology.edges?.length || 0;
+  const topologyTeams = topology.teams?.length || 0;
 
   return (
     <section className="premium-hero xl:col-span-4 lg:col-span-3 md:col-span-2">
@@ -74,6 +83,12 @@ export function MissionControlOverview() {
             <span className="pill-cyan">Project: {activeProject}</span>
             <span className="pill-violet">React War Room</span>
             <span className="pill-mint">Profiles read-only</span>
+            <span className="pill-amber" data-testid="mission-topology-pill">
+              Topology: {topologyAgents} agents · {topologyTeams} teams · {topologyEdges} edges
+            </span>
+            <span className="pill-cyan" data-testid="mission-research-pill">
+              Research: {research.length} artifacts
+            </span>
           </div>
         </div>
         <div className="radar-card">
@@ -107,6 +122,14 @@ export function MissionControlOverview() {
           <div className="metric-glass"><span>Blocked</span><strong className={blockedCards ? 'text-red-300' : 'text-emerald-300'}>{blockedCards}</strong></div>
           <div className="metric-glass"><span>Decisions</span><strong className="text-violet-300">{formatNumber(decisions.length)}</strong></div>
           <div className="metric-glass"><span>Memory</span><strong className="text-amber-300">{formatNumber(Object.keys(memory).length)}</strong></div>
+          <div className="metric-glass" data-testid="mission-research-card">
+            <span>Research</span>
+            <strong className="text-cyan-300">{formatNumber(research.length)}</strong>
+          </div>
+          <div className="metric-glass" data-testid="mission-departments-card">
+            <span>Departments</span>
+            <strong className="text-violet-300">{deptCount} · {deptFileCount} files</strong>
+          </div>
         </div>
       </div>
       {error && <div className="relative z-10 mt-4 text-xs text-red-300">Dashboard cache error: {error}</div>}

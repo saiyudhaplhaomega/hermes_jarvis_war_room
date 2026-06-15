@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Scheduler — Hermes Jarvis War Room</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --ink: #f8fafc;
+      --ink-secondary: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0ea5e9;
+      --danger: #ef4444;
+      --success: #10b981;
+      --border: #334155;
+      --radius: 8px;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 1rem;
+    }
+    
+    .sidebar {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1rem;
+      border: 1px solid var(--border);
+    }
+    
+    .sidebar h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .agent-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .agent-item {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: background 0.2s;
+    }
+    
+    .agent-item:hover {
+      background: var(--border);
+    }
+    
+    .agent-item .avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    
+    .agent-item .name {
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    
+    .canvas {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1rem;
+      border: 1px solid var(--border);
+      min-height: 80vh;
+    }
+    
+    .canvas h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    
+    #calendar {
+      max-width: 100%;
+    }
+    
+    .fc {
+      color: var(--ink) !important;
+    }
+    
+    .fc-header-toolbar {
+      margin-bottom: 1rem !important;
+    }
+    
+    .fc-button {
+      background: var(--border) !important;
+      border: none !important;
+      color: var(--ink) !important;
+      box-shadow: none !important;
+    }
+    
+    .fc-button:hover {
+      background: var(--ink-secondary) !important;
+    }
+    
+    .fc-button-primary {
+      background: var(--accent) !important;
+      color: var(--ink) !important;
+    }
+    
+    .fc-button-primary:hover {
+      background: var(--accent-hover) !important;
+    }
+    
+    .fc-event {
+      background: var(--accent) !important;
+      border: none !important;
+      color: var(--ink) !important;
+      cursor: pointer;
+    }
+    
+    .fc-event:hover {
+      background: var(--accent-hover) !important;
+    }
+    
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    
+    .modal {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+      width: 400px;
+      max-width: 90%;
+    }
+    
+    .modal h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    
+    .form-group label {
+      display: block;
+      font-size: 0.875rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      font-size: 0.875rem;
+      color: var(--ink);
+    }
+    
+    .modal-actions {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+    
+    .btn {
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: background 0.2s;
+    }
+    
+    .btn.primary {
+      background: var(--accent);
+      color: var(--ink);
+    }
+    
+    .btn.primary:hover {
+      background: var(--accent-hover);
+    }
+    
+    .btn.secondary {
+      background: var(--border);
+      color: var(--ink);
+    }
+    
+    .btn.secondary:hover {
+      background: var(--ink-secondary);
+    }
+    
+    .tweaks {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+    }
+    
+    .tweaks label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Sidebar: Agent List -->
+    <div class="sidebar">
+      <h2>Agents</h2>
+      <div class="agent-list" id="agentList">
+        <div class="agent-item" draggable="true" data-agent='{"name": "Researcher-001", "role": "Researcher", "avatar": "R"}'>
+          <div class="avatar">R</div>
+          <div class="name">Researcher-001</div>
+        </div>
+        <div class="agent-item" draggable="true" data-agent='{"name": "Writer-002", "role": "Writer", "avatar": "W"}'>
+          <div class="avatar">W</div>
+          <div class="name">Writer-002</div>
+        </div>
+        <div class="agent-item" draggable="true" data-agent='{"name": "Manager-003", "role": "Manager", "avatar": "M"}'>
+          <div class="avatar">M</div>
+          <div class="name">Manager-003</div>
+        </div>
+        <div class="agent-item" draggable="true" data-agent='{"name": "Engineer-004", "role": "Engineer", "avatar": "E"}'>
+          <div class="avatar">E</div>
+          <div class="name">Engineer-004</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Canvas: Calendar -->
+    <div class="canvas">
+      <h2>Agent Scheduler</h2>
+      <div id="calendar"></div>
+    </div>
+  </div>
+
+  <!-- Modal Overlay -->
+  <div class="modal-overlay" id="modalOverlay" style="display: none;">
+    <div class="modal">
+      <h2>Schedule Agent Run</h2>
+      <div class="form-group">
+        <label for="agentSelect">Agent</label>
+        <select id="agentSelect">
+          <option value="Researcher-001">Researcher-001 (Researcher)</option>
+          <option value="Writer-002">Writer-002 (Writer)</option>
+          <option value="Manager-003">Manager-003 (Manager)</option>
+          <option value="Engineer-004">Engineer-004 (Engineer)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="taskInput">Task</label>
+        <input type="text" id="taskInput" placeholder="e.g., Research competitors">
+      </div>
+      <div class="form-group">
+        <label for="startTime">Start Time</label>
+        <input type="datetime-local" id="startTime">
+      </div>
+      <div class="form-group">
+        <label for="frequency">Frequency</label>
+        <select id="frequency">
+          <option value="once">Once</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn secondary" id="cancelBtn">Cancel</button>
+        <button class="btn primary" id="saveBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tweaks Panel -->
+  <div class="tweaks">
+    <label>
+      <input type="checkbox" id="showWeekends" checked>
+      Show weekends
+    </label>
+    <label>
+      <input type="checkbox" id="showTooltips" checked>
+      Show tooltips
+    </label>
+  </div>
+
+  <script>
+    // FullCalendar
+    document.addEventListener('DOMContentLoaded', () => {
+      const calendarEl = document.getElementById('calendar');
+      const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+          left: 'prev,next today',
+          center: 'title',
+          right: 'dayGridMonth,timeGridWeek,timeGridDay'
+        },
+        events: [
+          {
+            title: 'Research Competitors',
+            start: new Date(Date.now() + 86400000).toISOString().split('T')[0], // Tomorrow
+            extendedProps: {
+              agent: 'Researcher-001',
+              frequency: 'once'
+            }
+          },
+          {
+            title: 'Refactor ACL Module',
+            start: '2026-06-15',
+            end: '2026-06-17',
+            extendedProps: {
+              agent: 'Engineer-004',
+              frequency: 'once'
+            }
+          },
+          {
+            title: 'Weekly Report',
+            start: '2026-06-14T10:00:00',
+            end: '2026-06-14T11:00:00',
+            extendedProps: {
+              agent: 'Manager-003',
+              frequency: 'weekly'
+            }
+          }
+        ],
+        dateClick: (info) => {
+          document.getElementById('startTime').value = info.dateStr + 'T09:00';
+          document.getElementById('modalOverlay').style.display = 'flex';
+        },
+        eventClick: (info) => {
+          alert(`Agent: ${info.event.extendedProps.agent}\nTask: ${info.event.title}\nFrequency: ${info.event.extendedProps.frequency}`);
+        }
+      });
+      calendar.render();
+    });
+    
+    // Modal
+    document.getElementById('cancelBtn').addEventListener('click', () => {
+      document.getElementById('modalOverlay').style.display = 'none';
+    });
+    
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      const agent = document.getElementById('agentSelect').value;
+      const task = document.getElementById('taskInput').value;
+      const startTime = document.getElementById('startTime').value;
+      const frequency = document.getElementById('frequency').value;
+      
+      if (!task) {
+        alert('Please enter a task.');
+        return;
+      }
+      
+      const calendar = FullCalendar.getCalendar(document.getElementById('calendar'));
+      calendar.addEvent({
+        title: task,
+        start: startTime,
+        extendedProps: {
+          agent,
+          frequency
+        }
+      });
+      
+      document.getElementById('modalOverlay').style.display = 'none';
+    });
+    
+    // Close modal on overlay click
+    document.getElementById('modalOverlay').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('modalOverlay')) {
+        document.getElementById('modalOverlay').style.display = 'none';
+      }
+    });
+    
+    // Tweaks
+    document.getElementById('showWeekends').addEventListener('change', (e) => {
+      const calendar = FullCalendar.getCalendar(document.getElementById('calendar'));
+      calendar.setOption('weekends', e.target.checked);
+    });
+    
+    document.getElementById('showTooltips').addEventListener('change', (e) => {
+      // Toggle tooltips (not implemented in this demo)
+    });
+  </script>
+</body>
+</html>

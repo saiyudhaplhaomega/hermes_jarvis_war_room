@@ -24,6 +24,12 @@ EXPECTED_ROUTE_POLICY = (
     (('GET',), '/api/plugins/jarvis-dashboard/v1/agents/{agent_id}/files'),
     (('POST',), '/api/plugins/jarvis-dashboard/v1/agents/{agent_id}/wake'),
     (('GET',), '/api/plugins/jarvis-dashboard/v1/agents/{agent_id}/wake-status'),
+    # D-2026-06-09 (Phase 2): skill catalog + per-project assignment
+    (('GET',), '/api/plugins/jarvis-dashboard/v1/catalog'),
+    (('GET',), '/api/plugins/jarvis-dashboard/v1/catalog/by-department/{department}'),
+    (('POST',), '/api/plugins/jarvis-dashboard/v1/catalog/refresh'),
+    (('GET',), '/api/plugins/jarvis-dashboard/v1/agents/{agent_name}/skills-by-project'),
+    (('POST',), '/api/plugins/jarvis-dashboard/v1/agents/skills-by-project'),
     (('GET',), '/api/plugins/jarvis-dashboard/v1/army/runs'),
     (('POST',), '/api/plugins/jarvis-dashboard/v1/army/runs'),
     (('GET',), '/api/plugins/jarvis-dashboard/v1/army/runs/{run_id}'),
@@ -50,6 +56,18 @@ EXPECTED_ROUTE_POLICY = (
     (('GET',), '/api/plugins/jarvis-dashboard/v1/dashboard/tasks'),
     (('GET',), '/api/plugins/jarvis-dashboard/v1/discord/threads'),
     (('POST',), '/api/plugins/jarvis-dashboard/v1/discord/webhook'),
+    # D-2026-06-09 (Phase 3): Discord gateway v2 — 1 channel + per-project threads.
+    # New module `api.discord_gateway.py` coexists with `api.discord_bridge.py`
+    # (v1 webhook receiver, kept stable).
+    (('GET',), '/api/plugins/jarvis-dashboard/v1/discord-gateway/threads'),
+    (('POST',), '/api/plugins/jarvis-dashboard/v1/discord-gateway/threads/ensure'),
+    (('POST',), '/api/plugins/jarvis-dashboard/v1/discord-gateway/messages'),
+    (('GET',), '/api/plugins/jarvis-dashboard/v1/discord-gateway/messages'),
+    # D-2026-06-09 (Phase 4): Council of Departments
+    (('GET',), '/api/plugins/jarvis-dashboard/v1/council/departments'),
+    (('POST',), '/api/plugins/jarvis-dashboard/v1/council/ask'),
+    (('GET',), '/api/plugins/jarvis-dashboard/v1/council/decisions'),
+    (('GET',), '/api/plugins/jarvis-dashboard/v1/council/decisions/{decision_id}'),
     (('POST',), '/api/plugins/jarvis-dashboard/v1/edges'),
     (('DELETE',), '/api/plugins/jarvis-dashboard/v1/edges/{edge_id}'),
     (('GET',), '/api/plugins/jarvis-dashboard/v1/events'),

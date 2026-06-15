@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YAML Workflow Editor — Hermes Jarvis War Room</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.33.0/min/vs/loader.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --ink: #f8fafc;
+      --ink-secondary: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0ea5e9;
+      --danger: #ef4444;
+      --success: #10b981;
+      --border: #334155;
+      --radius: 8px;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 1rem;
+    }
+    
+    .sidebar {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1rem;
+      border: 1px solid var(--border);
+    }
+    
+    .sidebar h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .workflow-templates {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .workflow-template {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      transition: background 0.2s;
+    }
+    
+    .workflow-template:hover {
+      background: var(--border);
+    }
+    
+    .workflow-template .name {
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    
+    .workflow-template .description {
+      font-size: 0.75rem;
+      color: var(--ink-secondary);
+    }
+    
+    .canvas {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1rem;
+      border: 1px solid var(--border);
+      min-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .canvas h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    
+    .editor-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    
+    .editor-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .btn {
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius);
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: background 0.2s;
+    }
+    
+    .btn.primary {
+      background: var(--accent);
+      color: var(--ink);
+    }
+    
+    .btn.primary:hover {
+      background: var(--accent-hover);
+    }
+    
+    .btn.secondary {
+      background: var(--border);
+      color: var(--ink);
+    }
+    
+    .btn.secondary:hover {
+      background: var(--ink-secondary);
+    }
+    
+    #editor {
+      flex-grow: 1;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.875rem;
+    }
+    
+    .validation-result {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      border-radius: var(--radius);
+      font-size: 0.75rem;
+    }
+    
+    .validation-result.success {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--success);
+    }
+    
+    .validation-result.error {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--danger);
+    }
+    
+    .tweaks {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+    }
+    
+    .tweaks label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Sidebar: Workflow Templates -->
+    <div class="sidebar">
+      <h2>Workflow Templates</h2>
+      <div class="workflow-templates" id="workflowTemplates">
+        <div class="workflow-template" data-workflow='{"name": "Research Competitors", "description": "Gather data on 5 competitors in the multi-agent space.", "yaml": "name: Research Competitors\ndescription: Gather data on 5 competitors in the multi-agent space.\nagents:\n  - name: Researcher-001\n    role: Researcher\n    goals:\n      - Identify 5 competitors\n      - Analyze their features\n      - Summarize findings\n    tools:\n      - Google Search\n      - Web Scraper\ntasks:\n  - name: Identify Competitors\n    agent: Researcher-001\n    description: Search for 5 competitors in the multi-agent space.\n  - name: Analyze Features\n    agent: Researcher-001\n    description: Analyze the features of each competitor.\n  - name: Summarize Findings\n    agent: Researcher-001\n    description: Summarize the findings in a report.\n"}'>
+          <div class="name">Research Competitors</div>
+          <div class="description">Gather data on 5 competitors in the multi-agent space.</div>
+        </div>
+        <div class="workflow-template" data-workflow='{"name": "Refactor ACL Module", "description": "Split acl.py into smaller modules for better maintainability.", "yaml": "name: Refactor ACL Module\ndescription: Split acl.py into smaller modules for better maintainability.\nagents:\n  - name: Engineer-002\n    role: Engineer\n    goals:\n      - Audit current ACL logic\n      - Design new module structure\n      - Implement changes\n      - Write tests\n    tools:\n      - GitHub\n      - VS Code\ntasks:\n  - name: Audit ACL Logic\n    agent: Engineer-002\n    description: Review the current ACL implementation in acl.py.\n  - name: Design Module Structure\n    agent: Engineer-002\n    description: Design a new module structure for ACL logic.\n  - name: Implement Changes\n    agent: Engineer-002\n    description: Refactor acl.py into smaller modules.\n  - name: Write Tests\n    agent: Engineer-002\n    description: Write unit tests for the new ACL modules.\n"}'>
+          <div class="name">Refactor ACL Module</div>
+          <div class="description">Split acl.py into smaller modules for better maintainability.</div>
+        </div>
+        <div class="workflow-template" data-workflow='{"name": "Add Role-Based Agents", "description": "Implement role-based agents (Researcher, Writer, Manager).", "yaml": "name: Add Role-Based Agents\ndescription: Implement role-based agents (Researcher, Writer, Manager).\nagents:\n  - name: Product-005\n    role: Product Manager\n    goals:\n      - Design role schema\n      - Update agent creation API\n      - Add role assignment UI\n      - Test with sample agents\n    tools:\n      - Notion\n      - Figma\n  - name: Engineer-002\n    role: Engineer\n    goals:\n      - Implement role schema\n      - Update agent creation API\n      - Add role assignment UI\n    tools:\n      - GitHub\n      - VS Code\ntasks:\n  - name: Design Role Schema\n    agent: Product-005\n    description: Design a schema for role-based agents.\n  - name: Update Agent Creation API\n    agent: Engineer-002\n    description: Update the agent creation API to support roles.\n  - name: Add Role Assignment UI\n    agent: Engineer-002\n    description: Add a UI for assigning roles to agents.\n  - name: Test with Sample Agents\n    agent: Product-005\n    description: Test the implementation with sample agents.\n"}'>
+          <div class="name">Add Role-Based Agents</div>
+          <div class="description">Implement role-based agents (Researcher, Writer, Manager).</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Canvas: YAML Editor -->
+    <div class="canvas">
+      <div class="editor-header">
+        <h2>YAML Workflow Editor</h2>
+        <div class="editor-actions">
+          <button class="btn secondary" id="validateBtn">Validate</button>
+          <button class="btn primary" id="saveBtn">Save</button>
+        </div>
+      </div>
+      
+      <div id="editor"></div>
+      
+      <div class="validation-result" id="validationResult" style="display: none;"></div>
+    </div>
+  </div>
+
+  <!-- Tweaks Panel -->
+  <div class="tweaks">
+    <label>
+      <input type="checkbox" id="showLineNumbers" checked>
+      Show line numbers
+    </label>
+    <label>
+      <input type="checkbox" id="showMinimap" checked>
+      Show minimap
+    </label>
+  </div>
+
+  <script>
+    // Monaco Editor
+    require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.33.0/min/vs' }});
+    require(['vs/editor/editor.main'], () => {
+      const editor = monaco.editor.create(document.getElementById('editor'), {
+        value: 'name: Research Competitors\ndescription: Gather data on 5 competitors in the multi-agent space.\nagents:\n  - name: Researcher-001\n    role: Researcher\n    goals:\n      - Identify 5 competitors\n      - Analyze their features\n      - Summarize findings\n    tools:\n      - Google Search\n      - Web Scraper\ntasks:\n  - name: Identify Competitors\n    agent: Researcher-001\n    description: Search for 5 competitors in the multi-agent space.\n  - name: Analyze Features\n    agent: Researcher-001\n    description: Analyze the features of each competitor.\n  - name: Summarize Findings\n    agent: Researcher-001\n    description: Summarize the findings in a report.',
+        language: 'yaml',
+        theme: 'vs-dark',
+        automaticLayout: true,
+        lineNumbers: 'on',
+        minimap: { enabled: true }
+      });
+      
+      // Workflow Templates
+      document.querySelectorAll('.workflow-template').forEach(template => {
+        template.addEventListener('click', () => {
+          const workflow = JSON.parse(template.dataset.workflow);
+          editor.setValue(workflow.yaml);
+        });
+      });
+      
+      // Validate YAML
+      document.getElementById('validateBtn').addEventListener('click', () => {
+        const yaml = editor.getValue();
+        const resultElement = document.getElementById('validationResult');
+        
+        try {
+          // Simulate YAML validation (in a real app, use a YAML parser)
+          if (yaml.includes('name:') && yaml.includes('agents:') && yaml.includes('tasks:')) {
+            resultElement.textContent = '✅ YAML is valid!';
+            resultElement.className = 'validation-result success';
+          } else {
+            throw new Error('Missing required fields (name, agents, tasks).');
+          }
+        } catch (error) {
+          resultElement.textContent = `❌ Validation error: ${error.message}`;
+          resultElement.className = 'validation-result error';
+        }
+        
+        resultElement.style.display = 'block';
+      });
+      
+      // Save YAML
+      document.getElementById('saveBtn').addEventListener('click', () => {
+        const yaml = editor.getValue();
+        const blob = new Blob([yaml], { type: 'text/yaml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'workflow.yaml';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+      
+      // Tweaks
+      document.getElementById('showLineNumbers').addEventListener('change', (e) => {
+        editor.updateOptions({ lineNumbers: e.target.checked ? 'on' : 'off' });
+      });
+      
+      document.getElementById('showMinimap').addEventListener('change', (e) => {
+        editor.updateOptions({ minimap: { enabled: e.target.checked } });
+      });
+    });
+  </script>
+</body>
+</html>

@@ -17,13 +17,25 @@ def test_release_report_schema_and_required_fields():
 
 def test_iron_law_fresh_evidence_rejects_stale_results(tmp_path):
     from ops.iron_law import FreshEvidenceGate
+    import os
+
+    src = tmp_path / "service.py"
+    src.write_text("x = 1\n")
+    # D-2026-06-09 (Phase 6): pin the source mtime to a known
+    # timestamp well BEFORE `time.time()` so the filesystem mtime
+    # resolution (Windows can be 1s on some FS) cannot land the
+    # source "newer than" the evidence. The previous reorder fix
+    # wasn't enough — on slow filesystems the source mtime can
+    # round up to the same second as the evidence timestamp and
+    # then stat() can return it as equal-or-greater on the next
+    # call. Pinning the source mtime to T-2s makes the test
+    # deterministic regardless of FS resolution.
+    past = time.time() - 2.0
+    os.utime(src, (past, past))
 
     evidence = tmp_path / "last_tests.json"
     evidence.write_text(json.dumps({"timestamp": time.time(), "exit_code": 0}))
     gate = FreshEvidenceGate(evidence_file=evidence)
-
-    src = tmp_path / "service.py"
-    src.write_text("x = 1\n")
 
     older = time.time() - 60
     stale_evidence = tmp_path / "stale.json"

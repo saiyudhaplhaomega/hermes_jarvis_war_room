@@ -3,6 +3,7 @@ import { useProject } from '../contexts/ProjectContext';
 import { api } from '../api/client';
 import type { Decision } from '../types/dashboard';
 import { PanelHeader } from './PanelHeader';
+import { errorMessage } from '../utils/config';
 
 export function DecisionLog() {
   const { project } = useProject();
@@ -12,10 +13,9 @@ export function DecisionLog() {
 
   useEffect(() => {
     let alive = true;
-    setError('');
     api.decisions(projectSlug || undefined)
       .then((res) => { if (alive) setDecisions(res || []); })
-      .catch((e) => { if (alive) setError(e.message || 'Decision log unavailable'); });
+      .catch((e: unknown) => { if (alive) setError(errorMessage(e, 'Decision log unavailable')); });
     return () => { alive = false; };
   }, [projectSlug]);
 

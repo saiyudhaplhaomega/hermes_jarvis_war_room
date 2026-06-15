@@ -1,5 +1,20 @@
 # Decision Log — Phase 2
 
+## Decision 9: Agentic Army Sprint — 14 new profiles, skill catalog, Discord bot, dashboard panel
+**Date:** 2026-06-09
+**Context:** User asked to grow the existing 8-agent war-room into the "best agentic army in the world" with 14+ new specialist profiles, a skill feed from curated GitHub repos, Discord bot wiring, and a dashboard UI to select skills per project.
+**Options:**
+- A. Do the full 5-phase plan (22 profiles, 2,500+ skills, 1 Discord bot, dashboard panel, Council of Departments). 26-37 hours.
+- B. Profiles + Discord only (skip skill catalog and dashboard panel). ~14 hours.
+- C. Skill catalog only (skip new profiles). ~14 hours.
+- D. Defer. 0 hours.
+**Decision:** Option A (full plan). Pending user answers to 8 open questions in `decisions/D-2026-06-09-agentic-army-sprint.md`.
+**Rationale:** Only Option A addresses the user's full vision: specialist profiles fed with skill repos, connected to Discord, manageable from a dashboard. Options B and C deliver only 1 of 3 pillars; Option D loses momentum.
+**Council:** Not yet convened (pending user input).
+**Brief:** `decisions/D-2026-06-09-agentic-army-sprint.md`
+**Research:** `docs/RESEARCH_LEDGER_AGENTIC_ARMY.md` (codex-audited)
+**Status:** PROPOSED — awaiting user answers.
+
 ## Decision 1: Use Three.js CDN, not npm build
 **Date:** 2026-05-29
 **Context:** Phase 2 spec requires 3D constellation. We could use npm + bundler, but the plugin is a single-file deployable asset.

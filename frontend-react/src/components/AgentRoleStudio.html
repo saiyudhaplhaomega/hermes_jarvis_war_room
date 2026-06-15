@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agent Role Studio — Hermes Jarvis War Room</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --ink: #f8fafc;
+      --ink-secondary: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0ea5e9;
+      --danger: #ef4444;
+      --success: #10b981;
+      --border: #334155;
+      --radius: 8px;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 1rem;
+    }
+    
+    .sidebar {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1rem;
+      border: 1px solid var(--border);
+    }
+    
+    .sidebar h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .role-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .role-item {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: background 0.2s;
+    }
+    
+    .role-item:hover {
+      background: var(--border);
+    }
+    
+    .role-item .avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    
+    .role-item .name {
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    
+    .role-item .description {
+      font-size: 0.75rem;
+      color: var(--ink-secondary);
+      margin-top: 0.25rem;
+    }
+    
+    .canvas {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1rem;
+      border: 1px solid var(--border);
+      min-height: 80vh;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .canvas h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    
+    .agent-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      width: 250px;
+      position: absolute;
+      cursor: grab;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s;
+    }
+    
+    .agent-card.dragging {
+      opacity: 0.5;
+      transform: scale(1.05);
+    }
+    
+    .agent-card .header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .agent-card .avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    
+    .agent-card .name {
+      font-weight: 600;
+      font-size: 0.875rem;
+    }
+    
+    .agent-card .role {
+      font-size: 0.75rem;
+      color: var(--ink-secondary);
+      margin-bottom: 0.5rem;
+    }
+    
+    .agent-card .tools {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .agent-card .tool {
+      background: var(--border);
+      border-radius: 4px;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.625rem;
+      color: var(--ink-secondary);
+    }
+    
+    .agent-card .goals {
+      font-size: 0.75rem;
+      color: var(--ink-secondary);
+    }
+    
+    .tweaks {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+    }
+    
+    .tweaks label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    @media (max-width: 768px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+      .agent-card {
+        position: relative;
+        width: 100%;
+        margin-bottom: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Sidebar: Available Roles -->
+    <div class="sidebar">
+      <h2>Available Roles</h2>
+      <div class="role-list" id="roleList">
+        <div class="role-item" draggable="true" data-role="Researcher">
+          <div class="avatar">R</div>
+          <div>
+            <div class="name">Researcher</div>
+            <div class="description">Gathers information, analyzes data, and provides insights.</div>
+          </div>
+        </div>
+        <div class="role-item" draggable="true" data-role="Writer">
+          <div class="avatar">W</div>
+          <div>
+            <div class="name">Writer</div>
+            <div class="description">Creates high-quality content, reports, and documentation.</div>
+          </div>
+        </div>
+        <div class="role-item" draggable="true" data-role="Manager">
+          <div class="avatar">M</div>
+          <div>
+            <div class="name">Manager</div>
+            <div class="description">Coordinates agents, delegates tasks, and ensures deadlines.</div>
+          </div>
+        </div>
+        <div class="role-item" draggable="true" data-role="Engineer">
+          <div class="avatar">E</div>
+          <div>
+            <div class="name">Engineer</div>
+            <div class="description">Writes, debugs, and optimizes code for technical tasks.</div>
+          </div>
+        </div>
+        <div class="role-item" draggable="true" data-role="Analyst">
+          <div class="avatar">A</div>
+          <div>
+            <div class="name">Analyst</div>
+            <div class="description">Interprets data, identifies trends, and makes recommendations.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Canvas: Agent Workspace -->
+    <div class="canvas" id="canvas">
+      <h2>Agent Role Studio</h2>
+      <!-- Agent cards will be added here dynamically -->
+    </div>
+  </div>
+
+  <!-- Tweaks Panel -->
+  <div class="tweaks">
+    <label>
+      <input type="checkbox" id="snapToGrid" checked>
+      Snap to grid
+    </label>
+    <label>
+      <input type="checkbox" id="showDescriptions" checked>
+      Show descriptions
+    </label>
+  </div>
+
+  <script>
+    // Drag-and-Drop Logic
+    let draggedItem = null;
+    let offset = { x: 0, y: 0 };
+    
+    // Role Items
+    document.querySelectorAll('.role-item').forEach(item => {
+      item.addEventListener('dragstart', (e) => {
+        draggedItem = e.target;
+        setTimeout(() => {
+          e.target.style.opacity = '0.5';
+        }, 0);
+      });
+      
+      item.addEventListener('dragend', (e) => {
+        e.target.style.opacity = '1';
+        if (e.dataTransfer.dropEffect === 'copy') {
+          createAgentCard(e.target.dataset.role, e.clientX, e.clientY);
+        }
+      });
+    });
+    
+    // Canvas
+    const canvas = document.getElementById('canvas');
+    canvas.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    });
+    
+    // Agent Cards
+    function createAgentCard(role, x, y) {
+      const rect = canvas.getBoundingClientRect();
+      const agents = {
+        Researcher: { avatar: 'R', tools: ['Google Search', 'Web Scraper', 'Knowledge DB'], goals: 'Gather data, analyze trends, provide insights.' },
+        Writer: { avatar: 'W', tools: ['Grammarly', 'Notion', 'Google Docs'], goals: 'Create high-quality content, reports, and documentation.' },
+        Manager: { avatar: 'M', tools: ['Jira', 'Trello', 'Calendar'], goals: 'Coordinate agents, delegate tasks, ensure deadlines.' },
+        Engineer: { avatar: 'E', tools: ['GitHub', 'VS Code', 'Terminal'], goals: 'Write, debug, and optimize code for technical tasks.' },
+        Analyst: { avatar: 'A', tools: ['Excel', 'Tableau', 'SQL'], goals: 'Interpret data, identify trends, and make recommendations.' }
+      };
+      
+      const agent = agents[role];
+      const card = document.createElement('div');
+      card.className = 'agent-card';
+      card.draggable = true;
+      card.style.left = `${x - rect.left - 20}px`;
+      card.style.top = `${y - rect.top - 20}px`;
+      card.innerHTML = `
+        <div class="header">
+          <div class="avatar">${agent.avatar}</div>
+          <div class="name">Agent ${Math.floor(Math.random() * 1000)}</div>
+        </div>
+        <div class="role">Role: ${role}</div>
+        <div class="tools">
+          ${agent.tools.map(tool => `<span class="tool">${tool}</span>`).join('')}
+        </div>
+        <div class="goals">Goals: ${agent.goals}</div>
+      `;
+      
+      card.addEventListener('dragstart', (e) => {
+        draggedItem = card;
+        card.classList.add('dragging');
+        offset = {
+          x: e.clientX - card.getBoundingClientRect().left,
+          y: e.clientY - card.getBoundingClientRect().top
+        };
+        e.dataTransfer.setData('text/plain', ''); // Required for Firefox
+      });
+      
+      card.addEventListener('dragend', () => {
+        card.classList.remove('dragging');
+      });
+      
+      canvas.appendChild(card);
+    }
+    
+    // Drag Agent Cards
+    canvas.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (draggedItem && draggedItem.classList.contains('agent-card')) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left - offset.x;
+        const y = e.clientY - rect.top - offset.y;
+        
+        draggedItem.style.left = `${x}px`;
+        draggedItem.style.top = `${y}px`;
+      }
+    });
+    
+    // Tweaks
+    document.getElementById('snapToGrid').addEventListener('change', (e) => {
+      // Toggle snap-to-grid logic here
+    });
+    
+    document.getElementById('showDescriptions').addEventListener('change', (e) => {
+      document.querySelectorAll('.role-item .description').forEach(el => {
+        el.style.display = e.target.checked ? 'block' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>

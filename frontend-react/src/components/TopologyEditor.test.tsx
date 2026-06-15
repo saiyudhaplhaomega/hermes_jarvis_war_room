@@ -5,7 +5,7 @@
  * GET /companies/{id}/topology and renders agents as nodes, edges as lines.
  * Sub-phase 3 will add write endpoints and the click-to-add-node UI.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { TopologyEditor } from '../components/TopologyEditor';
 import * as api from '../api/client';

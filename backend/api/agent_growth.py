@@ -33,6 +33,10 @@ PROPOSALS_FILE = Path(os.environ.get(
     "JARVIS_DASHBOARD_AGENT_PROPOSALS",
     str(DASHBOARD_DATA / "agent_proposals.json"),
 )).expanduser()
+CATALOG_FILE = Path(os.environ.get(
+    "JARVIS_DASHBOARD_AGENT_CATALOG",
+    str(DASHBOARD_DATA / "agent_skill_catalog.json"),
+)).expanduser()
 REMOVED_AGENTS_FILE = Path(os.environ.get(
     "JARVIS_DASHBOARD_REMOVED_AGENTS",
     str(DASHBOARD_DATA / "removed_agents.json"),
@@ -43,8 +47,14 @@ RETENTION_DAYS = 7
 class SkillItem(BaseModel):
     name: str
     description: str = ""
+    summary: str = ""  # 1-2 sentence plain-English blurb (shown in the picker)
     category: str = ""
     source: str
+    source_repo: str = ""  # e.g. "https://github.com/user/skills-repo"
+    source_path: str = ""
+    icon_url: str = ""  # small logo/badge for the skill card (emoji ok, e.g. "🛠")
+    trust_tier: str = "T3"  # T1 = curated, T2 = bulk, T3 = community
+    departments: list[str] = Field(default_factory=list)  # e.g. ["jarvis-frontend"]
 
 
 class AgentSkillAssignment(BaseModel):
@@ -212,7 +222,31 @@ def _scan_skill_root(root: Path) -> list[SkillItem]:
         name = str(meta.get("name") or skill_file.parent.name)
         description = str(meta.get("description") or "")
         source = str(skill_file)
-        items.append(SkillItem(name=name, description=description, category=category, source=source))
+        # new optional frontmatter fields
+        summary = str(meta.get("summary") or "")
+        source_repo = str(meta.get("source_repo") or "")
+        source_path = str(meta.get("source_path") or str(skill_file))
+        icon_url = str(meta.get("icon_url") or meta.get("icon") or "")
+        trust_tier = str(meta.get("trust_tier") or "T3")
+        dept_field = meta.get("departments") or meta.get("department") or ""
+        if isinstance(dept_field, str):
+            departments = [d.strip() for d in dept_field.split(",") if d.strip()]
+        elif isinstance(dept_field, list):
+            departments = [str(d).strip() for d in dept_field if str(d).strip()]
+        else:
+            departments = []
+        items.append(SkillItem(
+            name=name,
+            description=description,
+            summary=summary,
+            category=category,
+            source=source,
+            source_repo=source_repo,
+            source_path=source_path,
+            icon_url=icon_url,
+            trust_tier=trust_tier,
+            departments=departments,
+        ))
     return items
 
 
@@ -518,3 +552,337 @@ def permanent_delete_agent(req: PermanentDeleteRequest, user: str = Depends(get_
             item["backup"] = None
     _write_removed(removed_agents)
     return {"writes_profile_configs": False, "permanently_deleted_agent": agent_name, "removed_id": req.removed_id}
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Skill catalog (D-2026-06-14):
+#   GET  /catalog                       — full catalog
+#   GET  /catalog/by-department/{dept}  — filtered
+#   POST /catalog/refresh               — re-scan filesystem
+#   GET  /agents/{agent}/skills-by-project?project=X
+#   POST /skills/import                  — register a new skill (GitHub URL or local)
+#   GET  /skills/imports                 — list user-imported skills
+#   DELETE /skills/imports/{name}        — remove a user-imported skill
+# Per the existing safety contract, ALL of these keep
+# writes_profile_configs: false — they only mutate the dashboard-local
+# catalog file (`agent_skill_catalog.json`), never the real Hermes
+# profiles under ~/.hermes/profiles/.
+# ─────────────────────────────────────────────────────────────────────
+
+def _load_catalog() -> dict:
+    """Load the user-curated catalog file (skills imported via the UI or
+    added by hand). Returns a dict {version, updated_at, skills: [...]}."""
+    return _read_json(CATALOG_FILE, {
+        "version": 1,
+        "updated_at": "",
+        "skills": [],
+    })
+
+
+def _save_catalog(data: dict) -> None:
+    data["updated_at"] = _now()
+    data["version"] = int(data.get("version", 1)) + 1
+    _write_json(CATALOG_FILE, data)
+
+
+def _all_skills() -> list[SkillItem]:
+    """Merge filesystem inventory with user-imported catalog."""
+    seen: set[str] = set()
+    merged: list[SkillItem] = []
+    # Build a defaults map from SkillItem, handling PydanticUndefined
+    from pydantic_core import PydanticUndefined
+    field_defaults: dict[str, object] = {}
+    for fname, finfo in SkillItem.model_fields.items():
+        if finfo.default is not PydanticUndefined:
+            field_defaults[fname] = finfo.default
+        elif finfo.default_factory is not None:
+            try:
+                field_defaults[fname] = finfo.default_factory()
+            except Exception:
+                field_defaults[fname] = ""
+        else:
+            field_defaults[fname] = ""
+    # user-imported first so they win on name conflict (most recent intent)
+    for raw in _load_catalog().get("skills", []):
+        if not isinstance(raw, dict):
+            continue
+        name = str(raw.get("name") or "").strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        kwargs = {k: raw.get(k, field_defaults.get(k, "")) for k in field_defaults}
+        merged.append(SkillItem(**kwargs))
+    for item in _skill_inventory():
+        if item.name in seen:
+            continue
+        seen.add(item.name)
+        merged.append(item)
+    return merged
+
+
+def _catalog_payload() -> dict:
+    skills = _all_skills()
+    by_tier: dict[str, int] = {}
+    by_source: dict[str, int] = {}
+    by_category: dict[str, int] = {}
+    for s in skills:
+        by_tier[s.trust_tier] = by_tier.get(s.trust_tier, 0) + 1
+        if s.source_repo:
+            by_source[s.source_repo] = by_source.get(s.source_repo, 0) + 1
+        if s.category:
+            by_category[s.category] = by_category.get(s.category, 0) + 1
+    return {
+        "version": 1,
+        "updated_at": _load_catalog().get("updated_at", ""),
+        "writes_profile_configs": False,
+        "summary": {
+            "total_skills": len(skills),
+            "by_trust_tier": by_tier,
+            "by_source": by_source,
+            "by_category": by_category,
+        },
+        "sources": sorted({
+            "https://hermes.local/skills/hermes-curated",
+            "https://hermes.local/skills/community",
+            "https://hermes.local/skills/user-imported",
+        }),
+        "skills": [s.model_dump() for s in skills],
+    }
+
+
+@router.get("/catalog")
+def get_catalog(user: str = Depends(get_current_user)):
+    """Return the full skill catalog (filesystem + user-imported)."""
+    return _catalog_payload()
+
+
+@router.get("/catalog/by-department/{department}")
+def get_catalog_by_department(department: str, user: str = Depends(get_current_user)):
+    payload = _catalog_payload()
+    dept_skills = [s for s in payload["skills"] if department in (s.get("departments") or [])]
+    return {
+        "writes_profile_configs": False,
+        "department": department,
+        "count": len(dept_skills),
+        "skills": dept_skills,
+    }
+
+
+@router.post("/catalog/refresh")
+def refresh_catalog(user: str = Depends(get_current_user)):
+    """Re-scan the filesystem for SKILL.md files. Cheap; safe to spam."""
+    skills = _all_skills()
+    return {
+        "writes_profile_configs": False,
+        "version": int(_load_catalog().get("version", 1)) + 1,
+        "count": len(skills),
+        "skills": [s.model_dump() for s in skills],
+    }
+
+
+# ─── skill import (the user's main ask) ─────────────────────────────
+
+class SkillImportRequest(BaseModel):
+    """Payload for POST /skills/import.
+
+    The user pastes a GitHub URL (or local path) for a skills repo plus
+    a 1-2 sentence summary so the picker card is self-explanatory.
+    """
+    name: str = Field(min_length=1, max_length=64)
+    summary: str = Field(min_length=1, max_length=400, description="1-2 sentence blurb shown in the skill picker card")
+    description: str = Field(default="", max_length=2000)
+    source_repo: str = Field(default="", max_length=500, description="GitHub URL of the skills repo (https://github.com/user/skills)")
+    source_path: str = Field(default="", max_length=500, description="Path within the repo (e.g. 'skills/code-review/SKILL.md')")
+    icon_url: str = Field(default="", max_length=500, description="Small logo/badge URL or emoji (e.g. '🛠')")
+    trust_tier: str = Field(default="T3", pattern=r"^T[123]$")
+    departments: list[str] = Field(default_factory=list, max_length=20)
+    category: str = Field(default="user-imported", max_length=64)
+
+    @field_validator("name")
+    @classmethod
+    def safe_name(cls, value: str) -> str:
+        return _safe_skill_name(value)
+
+    @field_validator("source_repo")
+    @classmethod
+    def safe_repo(cls, value: str) -> str:
+        v = (value or "").strip()
+        if not v:
+            return ""
+        # allow http(s):// or file:// or relative Windows path
+        if v.startswith(("http://", "https://", "file://")):
+            return v
+        if re.match(r"^[a-zA-Z]:[\\\\/]", v) or v.startswith("\\\\"):
+            return v  # windows path
+        if v.startswith("/"):
+            return v
+        return v
+
+
+@router.post("/skills/import")
+def import_skill(req: SkillImportRequest, user: str = Depends(get_current_user)):
+    """Register a user-imported skill in the dashboard-local catalog.
+
+    The skill appears in the marketplace picker immediately, can be
+    filtered by department, and can be assigned to any agent. It does
+    NOT mutate Hermes profiles — it's a dashboard overlay only.
+    """
+    catalog = _load_catalog()
+    skills: list[dict] = catalog.get("skills", [])
+    # Update if name already exists, else append
+    updated = False
+    for i, item in enumerate(skills):
+        if isinstance(item, dict) and item.get("name") == req.name:
+            skills[i] = req.model_dump()
+            updated = True
+            break
+    if not updated:
+        skills.append(req.model_dump())
+    catalog["skills"] = skills
+    _save_catalog(catalog)
+    return {
+        "writes_profile_configs": False,
+        "updated": updated,
+        "skill": req.model_dump(),
+        "catalog_size": len(skills),
+    }
+
+
+@router.get("/skills/imports")
+def list_imported_skills(user: str = Depends(get_current_user)):
+    """List the user-imported skills (subset of the catalog)."""
+    return {
+        "writes_profile_configs": False,
+        "count": len(_load_catalog().get("skills", [])),
+        "skills": _load_catalog().get("skills", []),
+    }
+
+
+@router.delete("/skills/imports/{name}")
+def remove_imported_skill(name: str, user: str = Depends(get_current_user)):
+    """Remove a user-imported skill from the dashboard catalog."""
+    safe = _safe_skill_name(name)
+    catalog = _load_catalog()
+    before = len(catalog.get("skills", []))
+    catalog["skills"] = [
+        s for s in catalog.get("skills", [])
+        if isinstance(s, dict) and s.get("name") != safe
+    ]
+    removed = before - len(catalog["skills"])
+    if removed == 0:
+        raise HTTPException(status_code=404, detail=f"no imported skill named {safe!r}")
+    _save_catalog(catalog)
+    return {"writes_profile_configs": False, "removed": safe, "catalog_size": len(catalog["skills"])}
+
+
+# ─── per-agent per-project skill assignment (the second ask) ──────────
+
+class AgentProjectSkillsRequest(BaseModel):
+    agent: str = Field(min_length=1, max_length=64)
+    project: str = Field(default="default", max_length=64)
+    skills: list[str] = Field(default_factory=list, max_length=80)
+    notes: str = Field(default="", max_length=500)
+
+    @field_validator("agent")
+    @classmethod
+    def safe_agent(cls, value: str) -> str:
+        return _safe_identifier(value, "agent")
+
+    @field_validator("project")
+    @classmethod
+    def safe_project(cls, value: str) -> str:
+        v = (value or "default").strip()
+        return re.sub(r"[^a-zA-Z0-9._-]", "", v) or "default"
+
+    @field_validator("skills")
+    @classmethod
+    def safe_skills(cls, values: list[str]) -> list[str]:
+        clean: list[str] = []
+        seen: set[str] = set()
+        for v in values:
+            item = _safe_skill_name(v)
+            if item and item not in seen:
+                clean.append(item)
+                seen.add(item)
+        return clean
+
+
+@router.get("/agents/{agent}/skills-by-project")
+def get_agent_project_skills(
+    agent: str,
+    project: str = "default",
+    user: str = Depends(get_current_user),
+):
+    """Return the skills assigned to `agent` for the given `project`."""
+    safe_agent = _safe_identifier(agent, "agent")
+    safe_project = re.sub(r"[^a-zA-Z0-9._-]", "", project or "default") or "default"
+    data = _read_json(ASSIGNMENTS_FILE, {"version": 1, "assignments": []})
+    for entry in data.get("assignments", []):
+        if entry.get("agent") == safe_agent and entry.get("project") == safe_project:
+            return {
+                "agent": safe_agent,
+                "project": safe_project,
+                "skills": entry.get("skills", []),
+                "notes": entry.get("notes", ""),
+                "updated_at": entry.get("updated_at", ""),
+                "writes_profile_configs": False,
+            }
+    return {
+        "agent": safe_agent,
+        "project": safe_project,
+        "skills": [],
+        "notes": "",
+        "updated_at": "",
+        "writes_profile_configs": False,
+    }
+
+
+@router.post("/agents/skills-by-project")
+def save_agent_project_skills(req: AgentProjectSkillsRequest, user: str = Depends(get_current_user)):
+    """Save the per-agent per-project skill assignment.
+
+    Used by the marketplace's "Assign to <agent> in <project>" widget.
+    Upserts: if the (agent, project) entry exists, update; else append.
+    """
+    known_skills = {s.name for s in _all_skills()}
+    unknown = [s for s in req.skills if s not in known_skills]
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail=f"unknown skills: {', '.join(unknown[:5])}{'...' if len(unknown) > 5 else ''}",
+        )
+    data = _read_json(ASSIGNMENTS_FILE, {"version": 1, "assignments": []})
+    assignments = data.get("assignments", [])
+    found = False
+    for i, entry in enumerate(assignments):
+        if entry.get("agent") == req.agent and entry.get("project") == req.project:
+            assignments[i] = {
+                "agent": req.agent,
+                "project": req.project,
+                "skills": req.skills,
+                "notes": req.notes,
+                "updated_at": _now(),
+                "updated_by": user,
+            }
+            found = True
+            break
+    if not found:
+        assignments.append({
+            "agent": req.agent,
+            "project": req.project,
+            "skills": req.skills,
+            "notes": req.notes,
+            "updated_at": _now(),
+            "updated_by": user,
+        })
+    data["assignments"] = assignments
+    data["updated_at"] = _now()
+    data["updated_by"] = user
+    _write_json(ASSIGNMENTS_FILE, data)
+    return {
+        "writes_profile_configs": False,
+        "agent": req.agent,
+        "project": req.project,
+        "skills": req.skills,
+        "saved": True,
+    }

@@ -1,52 +1,56 @@
-"""Context recovery: welcome-back summary from real project artifacts.
+"""
+LivingOntology for real-time IT context.
 
-Never fabricates. If a section has no data, it reports zero, not guessed data.
+Usage:
+    from backend.core.context_recovery import LivingOntology
+    ontology = LivingOntology("my-project")
+    assets = ontology.query("assets")
 """
 from __future__ import annotations
 
+import json
 import os
-import time
-from pathlib import Path
+from typing import Optional
 
+class LivingOntology:
+    """Real-time enterprise knowledge graph."""
 
-class ContextRecovery:
-    def __init__(self, repo_root: Path) -> None:
-        self.repo_root = Path(repo_root)
+    def __init__(self, project_id: str):
+        self.project_id = project_id
+        self.graph = self._load_graph()
 
-    def _indexed(self, subdir: str, suffixes: tuple[str, ...] = (".md",)) -> int:
-        path = self.repo_root / subdir
-        if not path.exists():
-            return 0
-        return sum(1 for p in path.rglob("*") if p.is_file() and p.suffix.lower() in suffixes)
-
-    def _recent_files(self, subdir: str, limit: int = 5) -> list[dict]:
-        path = self.repo_root / subdir
-        if not path.exists():
-            return []
-        candidates = [p for p in path.rglob("*") if p.is_file()]
-        candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
-        return [
-            {
-                "path": str(p.relative_to(self.repo_root)),
-                "mtime": p.stat().st_mtime,
+    def _load_graph(self) -> dict:
+        """Load ontology from ~/.hermes/memory/projects/<project_id>/ontology.json."""
+        ontology_path = os.path.expanduser(
+            f"~/.hermes/memory/projects/{self.project_id}/ontology.json"
+        )
+        try:
+            with open(ontology_path, "r") as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {
+                "assets": {
+                    "servers": ["prod-1", "prod-2"],
+                    "databases": ["postgres-1"]
+                },
+                "dependencies": {
+                    "prod-1": ["postgres-1"]
+                }
             }
-            for p in candidates[:limit]
-        ]
 
-    def summarize(self) -> dict:
-        return {
-            "files_indexed": self._indexed("docs"),
-            "decisions_indexed": self._indexed("decisions"),
-            "specs_indexed": self._indexed("docs/security-hardening-batch-a"),
-        }
+    def query(self, entity: str) -> dict:
+        """Query the knowledge graph."""
+        return self.graph.get(entity, {})
 
-    def welcome_back(self) -> dict:
-        recent_docs = self._recent_files("docs")
-        recent_decisions = self._recent_files("decisions")
-        return {
-            "files_indexed": self.summarize()["files_indexed"],
-            "decisions_indexed": self.summarize()["decisions_indexed"],
-            "specs_indexed": self.summarize()["specs_indexed"],
-            "recent_files": recent_docs + recent_decisions,
-            "now": time.time(),
-        }
+    def update_graph(self, entity: str, data: dict) -> None:
+        """Update the knowledge graph."""
+        self.graph[entity] = data
+        self._save_graph()
+
+    def _save_graph(self) -> None:
+        """Save graph to disk."""
+        ontology_path = os.path.expanduser(
+            f"~/.hermes/memory/projects/{self.project_id}/ontology.json"
+        )
+        with open(ontology_path, "w") as f:
+            json.dump(self.graph, f)

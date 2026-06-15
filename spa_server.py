@@ -16,7 +16,7 @@ def _arg_int(index: int, default: int) -> int:
 
 
 PORT = _arg_int(1, 8503)
-ROOT = sys.argv[2] if len(sys.argv) > 2 else "/home/ubuntu/.hermes/profiles/jarvis/plugins/jarvis-dashboard/frontend-react/dist"
+ROOT = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(__file__), "frontend-react", "dist")
 HOST = sys.argv[3] if len(sys.argv) > 3 else "127.0.0.1"
 INDEX = os.path.join(ROOT, "index.html")
 BACKEND = "http://127.0.0.1:8502"
@@ -89,6 +89,11 @@ def _proxy_to_backend(handler):
             for k, v in resp.headers.items():
                 if k.lower() not in ('transfer-encoding', 'content-encoding', 'connection'):
                     handler.send_header(k, v)
+            # Add CORS headers
+            handler.send_header('Access-Control-Allow-Origin', 'http://localhost:5173')
+            handler.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
+            handler.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+            handler.send_header('Access-Control-Allow-Credentials', 'true')
             handler.end_headers()
             handler.wfile.write(resp.read())
     except urllib.error.HTTPError as e:

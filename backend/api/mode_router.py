@@ -149,8 +149,16 @@ def _load_agent_profile(agent: str) -> dict:
             cfg = yaml.safe_load(cfg_path.read_text()) or {}
         except Exception:
             cfg = {}
+    if not isinstance(cfg, dict):
+        cfg = {}
     profile = cfg.get("profile") or {}
+    if not isinstance(profile, dict):
+        profile = {}
     model_cfg = cfg.get("model") or {}
+    if isinstance(model_cfg, str):
+        model_cfg = {"default": model_cfg}
+    elif not isinstance(model_cfg, dict):
+        model_cfg = {}
     soul_excerpt = ""
     if soul_path.exists():
         try:
@@ -170,7 +178,20 @@ def _load_agent_profile(agent: str) -> dict:
 
 
 def _agent_provider_candidates(agent_profile: dict) -> list:
-    candidates = []
+    """Return a list of provider candidates in priority order.
+
+    Each candidate is a tuple:
+        ("http", base_url, api_key, model) — HTTP chat-completions endpoint
+        ("cli",  cli_name, model)            — local CLI binary (codex, claude)
+
+    The CLI candidates are added as a fallback when no HTTP provider has a
+    valid API key. The user opts in via JARVIS_CLI_PROVIDER:
+        auto  — use codex if on PATH, else claude (default)
+        codex — only codex
+        claude — only claude
+        none  — never fall back to CLI
+    """
+    candidates: list = []
     provider = agent_profile.get("provider", "")
     model = agent_profile.get("model") or "kimi-k2.6"
     base_url = agent_profile.get("base_url") or ""
@@ -180,22 +201,126 @@ def _agent_provider_candidates(agent_profile: dict) -> list:
         key = _env_value(api_key_env) if api_key_env else _env_value("OLLAMA_API_KEY")
         base = base_url or _env_value("OLLAMA_BASE_URL") or "https://ollama.com/v1"
         if key:
-            candidates.append((base, key, model))
+            candidates.append(("http", base, key, model))
     elif provider in ("openrouter", "openrouter.ai"):
         key = _env_value(api_key_env) if api_key_env else _env_value("OPENROUTER_API_KEY")
         base = base_url or "https://openrouter.ai/api/v1"
         if key:
-            candidates.append((base, key, model))
+            candidates.append(("http", base, key, model))
 
     ollama_key = _env_value("OLLAMA_API_KEY")
     ollama_base = _env_value("OLLAMA_BASE_URL") or "https://ollama.com/v1"
-    if ollama_key and (ollama_base, ollama_key, "kimi-k2.6") not in candidates:
-        candidates.append((ollama_base, ollama_key, "kimi-k2.6"))
+    if ollama_key and ("http", ollama_base, ollama_key, "kimi-k2.6") not in candidates:
+        candidates.append(("http", ollama_base, ollama_key, "kimi-k2.6"))
     openrouter_key = _env_value("OPENROUTER_API_KEY")
     if openrouter_key:
-        candidates.append(("https://openrouter.ai/api/v1", openrouter_key, "anthropic/claude-sonnet-4"))
-        candidates.append(("https://openrouter.ai/api/v1", openrouter_key, "openai/gpt-4o"))
+        candidates.append(("http", "https://openrouter.ai/api/v1", openrouter_key, "anthropic/claude-sonnet-4"))
+        candidates.append(("http", "https://openrouter.ai/api/v1", openrouter_key, "openai/gpt-4o"))
+
+    # CLI fallback: only when the user opted in (default = auto)
+    if not any(c[0] == "http" for c in candidates):
+        cli_pref = (_env_value("JARVIS_CLI_PROVIDER") or "auto").strip().lower()
+        if cli_pref not in ("none", "off", "0"):
+            have_codex = _which("codex")
+            have_claude = _which("claude")
+            chosen: list[tuple[str, str]] = []
+            if cli_pref == "codex" and have_codex:
+                chosen.append(("codex", have_codex))
+            elif cli_pref == "claude" and have_claude:
+                chosen.append(("claude", have_claude))
+            elif cli_pref == "auto":
+                if have_codex:
+                    chosen.append(("codex", have_codex))
+                if have_claude:
+                    chosen.append(("claude", have_claude))
+            for cli_name, cli_path in chosen:
+                candidates.append(("cli", cli_name, cli_path))
     return candidates
+
+
+def _which(binary: str) -> str:
+    """Return absolute path to `binary` if it exists on PATH, else ''.
+
+    Uses shutil.which (stdlib, no shell), bounded, and Windows-safe.
+    """
+    import shutil
+    found = shutil.which(binary)
+    return found or ""
+
+
+def _build_cli_prompt(messages: list) -> str:
+    """Flatten an OpenAI-style messages array into a deterministic transcript.
+
+    Sections are clearly delimited so the CLI agent (codex/claude) can parse
+    them. System + project context go first, then history, then the user turn.
+    """
+    sys_msgs = [m["content"] for m in messages if m.get("role") == "system"]
+    hist_msgs = [m for m in messages if m.get("role") in ("user", "assistant") and m is not messages[-1]]
+    last_user = next((m["content"] for m in reversed(messages) if m.get("role") == "user"), "")
+
+    parts: list[str] = []
+    if sys_msgs:
+        parts.append("=== SYSTEM INSTRUCTIONS ===\n" + "\n\n".join(sys_msgs).strip())
+    if hist_msgs:
+        hist_lines = []
+        for m in hist_msgs[-10:]:
+            role = m.get("role", "user").upper()
+            content = (m.get("content") or "").strip()
+            if not content:
+                continue
+            # Escape triple-backticks so the CLI doesn't get confused by code blocks
+            content = content.replace("```", "ʼʼʼ")
+            hist_lines.append(f"[{role}]\n{content[:1500]}")
+        if hist_lines:
+            parts.append("=== CHAT HISTORY (most recent last) ===\n" + "\n\n".join(hist_lines))
+    if last_user:
+        parts.append("=== USER REQUEST (respond to this) ===\n" + last_user.strip().replace("```", "ʼʼʼ"))
+    parts.append("=== END ===\nRespond directly to the user. Be concise.")
+    return "\n\n".join(parts)
+
+
+def _cli_response(cli_name: str, cli_path: str, messages: list, timeout: int = 90) -> str | None:
+    """Shell out to a local CLI (codex or claude) and return its text output.
+
+    Uses subprocess.run with a hard timeout, captures stdout/stderr, no shell.
+    Returns None on any error so the caller can fall through to templates.
+    """
+    import subprocess
+    prompt = _build_cli_prompt(messages)
+    if not prompt.strip():
+        return None
+    # Cap the prompt size to keep CLI invocation bounded.
+    if len(prompt) > 30000:
+        prompt = prompt[:30000] + "\n\n[prompt truncated to 30000 chars]"
+
+    if cli_name == "codex":
+        cmd = [
+            cli_path, "exec",
+            "--skip-git-repo-check",
+            "--dangerously-bypass-approvals-and-sandbox",
+            prompt,
+        ]
+    elif cli_name == "claude":
+        cmd = [cli_path, "-p", "--dangerously-skip-permissions", prompt]
+    else:
+        return None
+
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except subprocess.TimeoutExpired:
+        return f"[{cli_name} CLI timed out after {timeout}s]"
+    except Exception as e:
+        return None
+    if proc.returncode != 0 and not proc.stdout.strip():
+        return None
+    return (proc.stdout or "").strip() or None
 
 
 def _mode_system_prompt(mode: str, agent_profile: dict | None = None) -> str:
@@ -349,9 +474,17 @@ def _llm_response(mode: str, msg: str, project_slug: str, agent: str = "jarvis")
 
     providers = _agent_provider_candidates(agent_profile)
 
-    for base, key, model in providers:
+    for cand in providers:
+        kind = cand[0]
         try:
-            text = _chat_completion_request(base, key, model, messages)
+            if kind == "http":
+                _, base, key, model = cand
+                text = _chat_completion_request(base, key, model, messages)
+            elif kind == "cli":
+                _, cli_name, cli_path = cand
+                text = _cli_response(cli_name, cli_path, messages)
+            else:
+                continue
             if text:
                 intent = _parse_intent(msg)
                 tier = _infer_tier(msg, intent)
@@ -363,6 +496,7 @@ def _llm_response(mode: str, msg: str, project_slug: str, agent: str = "jarvis")
                     tier = max(tier, 2)
                 elif mode == "spike":
                     tier = max(tier, 1)
+                provider_model = model if kind == "http" else f"{cli_name}-cli"
                 return {
                     "mode": mode,
                     "tier": tier,
@@ -372,7 +506,8 @@ def _llm_response(mode: str, msg: str, project_slug: str, agent: str = "jarvis")
                     "council_required": tier >= 3,
                     "can_exec": MODES.get(mode, MODES["standard"])["exec"],
                     "llm": True,
-                    "provider_model": model,
+                    "provider_type": kind,
+                    "provider_model": provider_model,
                     "agent": agent_profile.get("name", agent),
                 }
         except Exception:

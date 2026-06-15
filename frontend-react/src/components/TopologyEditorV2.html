@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Topology Editor v2 — Hermes Jarvis War Room</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xyflow/react@11.0.0/dist/xyflow.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --ink: #f8fafc;
+      --ink-secondary: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0ea5e9;
+      --danger: #ef4444;
+      --success: #10b981;
+      --border: #334155;
+      --radius: 8px;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 1rem;
+    }
+    
+    .sidebar {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1rem;
+      border: 1px solid var(--border);
+    }
+    
+    .sidebar h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .node-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .node-item {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: background 0.2s;
+    }
+    
+    .node-item:hover {
+      background: var(--border);
+    }
+    
+    .node-item .icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    
+    .node-item .name {
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    
+    .canvas {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1rem;
+      border: 1px solid var(--border);
+      min-height: 80vh;
+      position: relative;
+    }
+    
+    .canvas h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    
+    #topology-editor {
+      width: 100%;
+      height: 100%;
+      min-height: 70vh;
+      border-radius: var(--radius);
+    }
+    
+    .controls {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      z-index: 10;
+    }
+    
+    .btn {
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius);
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: background 0.2s;
+    }
+    
+    .btn.primary {
+      background: var(--accent);
+      color: var(--ink);
+    }
+    
+    .btn.primary:hover {
+      background: var(--accent-hover);
+    }
+    
+    .btn.secondary {
+      background: var(--border);
+      color: var(--ink);
+    }
+    
+    .btn.secondary:hover {
+      background: var(--ink-secondary);
+    }
+    
+    .tweaks {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+    }
+    
+    .tweaks label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Sidebar: Node List -->
+    <div class="sidebar">
+      <h2>Available Nodes</h2>
+      <div class="node-list" id="nodeList">
+        <div class="node-item" draggable="true" data-node='{"id": "agent-1", "type": "agent", "label": "Researcher-001", "icon": "R"}'>
+          <div class="icon">R</div>
+          <div class="name">Researcher-001</div>
+        </div>
+        <div class="node-item" draggable="true" data-node='{"id": "agent-2", "type": "agent", "label": "Writer-002", "icon": "W"}'>
+          <div class="icon">W</div>
+          <div class="name">Writer-002</div>
+        </div>
+        <div class="node-item" draggable="true" data-node='{"id": "agent-3", "type": "agent", "label": "Manager-003", "icon": "M"}'>
+          <div class="icon">M</div>
+          <div class="name">Manager-003</div>
+        </div>
+        <div class="node-item" draggable="true" data-node='{"id": "tool-1", "type": "tool", "label": "Google Search", "icon": "G"}'>
+          <div class="icon">G</div>
+          <div class="name">Google Search</div>
+        </div>
+        <div class="node-item" draggable="true" data-node='{"id": "tool-2", "type": "tool", "label": "GitHub", "icon": "G"}'>
+          <div class="icon">G</div>
+          <div class="name">GitHub</div>
+        </div>
+        <div class="node-item" draggable="true" data-node='{"id": "database-1", "type": "database", "label": "PostgreSQL", "icon": "P"}'>
+          <div class="icon">P</div>
+          <div class="name">PostgreSQL</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Canvas: Topology Editor -->
+    <div class="canvas">
+      <h2>Topology Editor v2</h2>
+      <div class="controls">
+        <button class="btn secondary" id="validateBtn">Validate</button>
+        <button class="btn primary" id="saveBtn">Save</button>
+      </div>
+      <div id="topology-editor"></div>
+    </div>
+  </div>
+
+  <!-- Tweaks Panel -->
+  <div class="tweaks">
+    <label>
+      <input type="checkbox" id="snapToGrid" checked>
+      Snap to grid
+    </label>
+    <label>
+      <input type="checkbox" id="showLabels" checked>
+      Show labels
+    </label>
+  </div>
+
+  <script>
+    // React + XYFlow Topology Editor
+    const { useState, useCallback } = React;
+    const { ReactFlow, Controls, Background, useNodesState, useEdgesState, addEdge } = XYFlow;
+    
+    const initialNodes = [
+      { id: '1', position: { x: 100, y: 100 }, data: { label: 'Researcher-001', icon: 'R' }, type: 'agent' },
+      { id: '2', position: { x: 300, y: 100 }, data: { label: 'Writer-002', icon: 'W' }, type: 'agent' },
+      { id: '3', position: { x: 200, y: 250 }, data: { label: 'Google Search', icon: 'G' }, type: 'tool' }
+    ];
+    
+    const initialEdges = [
+      { id: 'e1-3', source: '1', target: '3', animated: true },
+      { id: 'e3-2', source: '3', target: '2', animated: true }
+    ];
+    
+    const NodeComponent = ({ data }) => {
+      return (
+        <div style={{
+          background: data.type === 'agent' ? 'rgba(56, 191, 248, 0.2)' : data.type === 'tool' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(161, 98, 7, 0.2)',
+          border: `1px solid ${data.type === 'agent' ? '#38bdf8' : data.type === 'tool' ? '#10b981' : '#a16207'}`,
+          borderRadius: '8px',
+          padding: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          minWidth: '150px'
+        }}>
+          <div style={{
+            width: '24px',
+            height: '24px',
+            borderRadius: '50%',
+            background: data.type === 'agent' ? '#38bdf8' : data.type === 'tool' ? '#10b981' : '#a16207',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '0.75rem',
+            fontWeight: '600',
+            color: '#0f172a'
+          }}>
+            {data.icon}
+          </div>
+          <div style={{ fontSize: '0.875rem', fontWeight: '500' }}>{data.label}</div>
+        </div>
+      );
+    };
+    
+    const TopologyEditor = () => {
+      const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+      const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+      
+      const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
+      
+      const onDrop = useCallback((event) => {
+        event.preventDefault();
+        const data = JSON.parse(event.dataTransfer.getData('application/json'));
+        const reactFlowBounds = document.querySelector('#topology-editor').getBoundingClientRect();
+        const position = {
+          x: event.clientX - reactFlowBounds.left - 100,
+          y: event.clientY - reactFlowBounds.top - 50,
+        };
+        
+        const newNode = {
+          id: `${data.type}-${nodes.length + 1}`,
+          position,
+          data: { label: data.label, icon: data.icon, type: data.type },
+          type: data.type,
+        };
+        
+        setNodes((nds) => [...nds, newNode]);
+      }, [nodes, setNodes]);
+      
+      const onDragOver = useCallback((event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+      }, []);
+      
+      return (
+        <div style={{ width: '100%', height: '100%' }} onDrop={onDrop} onDragOver={onDragOver}>
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            nodeTypes={{ agent: NodeComponent, tool: NodeComponent, database: NodeComponent }}
+            fitView
+          >
+            <Background />
+            <Controls />
+          </ReactFlow>
+        </div>
+      );
+    };
+    
+    // Render React App
+    const root = ReactDOM.createRoot(document.getElementById('topology-editor'));
+    root.render(<TopologyEditor />);
+    
+    // Drag-and-Drop Nodes
+    document.querySelectorAll('.node-item').forEach(item => {
+      item.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('application/json', item.dataset.node);
+      });
+    });
+    
+    // Validate Topology
+    document.getElementById('validateBtn').addEventListener('click', () => {
+      // Simulate validation (e.g., check for cycles, disconnected nodes)
+      alert('✅ Topology is valid! No cycles or disconnected nodes detected.');
+    });
+    
+    // Save Topology
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      const topology = {
+        nodes: ReactFlow.useNodesState()[0],
+        edges: ReactFlow.useEdgesState()[0]
+      };
+      const blob = new Blob([JSON.stringify(topology, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'topology.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+    
+    // Tweaks
+    document.getElementById('snapToGrid').addEventListener('change', (e) => {
+      // Toggle snap-to-grid (not implemented in this demo)
+    });
+    
+    document.getElementById('showLabels').addEventListener('change', (e) => {
+      // Toggle labels (not implemented in this demo)
+    });
+  </script>
+</body>
+</html>

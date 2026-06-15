@@ -45,6 +45,9 @@ def _resolve_paths() -> tuple[Path, Path]:
     return db_path, home
 
 # Council hierarchy: child -> parent (per Boss D-D verification #2)
+# Updated 2026-06-09 (Agentic Army sprint, D-2026-06-09) to include the
+# 14 new specialist profiles. See scripts/hermes_profiles.yaml for the
+# canonical source. Profile == Agent for these new entries.
 COUNCIL_HIERARCHY = {
     "jarvis-manager": "jarvis-boss",
     "jarvis-secretary": "jarvis-manager",
@@ -55,13 +58,28 @@ COUNCIL_HIERARCHY = {
     "jarvis-product-lead": "jarvis-manager",
     "jarvis-scout": "jarvis-manager",
     "jarvis-council": "jarvis-boss",
+    "jarvis-council-departments": "jarvis-boss",
     "jarvis": "jarvis-boss",
     "quant-boss": "jarvis-boss",
     "researcher": "jarvis-docs-lead",
     "poopmaster": "jarvis",
+    # ── New specialist profiles (D-2026-06-09) ────────────────────────
+    "jarvis-frontend": "jarvis-engineering-lead",
+    "jarvis-ui_ux": "jarvis-product-lead",
+    "jarvis-backend": "jarvis-engineering-lead",
+    "jarvis-mobile": "jarvis-engineering-lead",
+    "jarvis-data-ml": "jarvis-engineering-lead",
+    "jarvis-devops": "jarvis-engineering-lead",
+    "jarvis-marketing": "jarvis-product-lead",
+    "jarvis-sales": "jarvis-product-lead",
+    "jarvis-finance": "jarvis-boss",
+    "jarvis-legal": "jarvis-boss",
+    "jarvis-customer-success": "jarvis-product-lead",
+    "jarvis-researcher": "jarvis-docs-lead",
 }
 
 # Horizontal collaborations (collaborates_with edges)
+# Updated 2026-06-09 — derived from the YAML spec.
 COLLABORATIONS = [
     ("jarvis-engineering-lead", "jarvis-qa-lead"),
     ("jarvis-engineering-lead", "jarvis-security-lead"),
@@ -70,6 +88,37 @@ COLLABORATIONS = [
     ("jarvis-qa-lead", "jarvis-security-lead"),
     ("jarvis-manager", "jarvis-secretary"),
     ("jarvis-boss", "jarvis-council"),
+    ("jarvis-boss", "jarvis-council-departments"),
+    # ── New specialist collaborations (D-2026-06-09) ──────────────────
+    ("jarvis-frontend", "jarvis-ui_ux"),
+    ("jarvis-frontend", "jarvis-backend"),
+    ("jarvis-frontend", "jarvis-qa-lead"),
+    ("jarvis-ui_ux", "jarvis-product-lead"),
+    ("jarvis-backend", "jarvis-data-ml"),
+    ("jarvis-backend", "jarvis-devops"),
+    ("jarvis-backend", "jarvis-qa-lead"),
+    ("jarvis-backend", "jarvis-security-lead"),
+    ("jarvis-mobile", "jarvis-frontend"),
+    ("jarvis-mobile", "jarvis-ui_ux"),
+    ("jarvis-mobile", "jarvis-backend"),
+    ("jarvis-data-ml", "jarvis-devops"),
+    ("jarvis-data-ml", "jarvis-researcher"),
+    ("jarvis-devops", "jarvis-security-lead"),
+    ("jarvis-marketing", "jarvis-sales"),
+    ("jarvis-marketing", "jarvis-ui_ux"),
+    ("jarvis-marketing", "jarvis-product-lead"),
+    ("jarvis-sales", "jarvis-finance"),
+    ("jarvis-sales", "jarvis-customer-success"),
+    ("jarvis-finance", "jarvis-legal"),
+    ("jarvis-legal", "jarvis-security-lead"),
+    ("jarvis-legal", "jarvis-product-lead"),
+    ("jarvis-customer-success", "jarvis-qa-lead"),
+    ("jarvis-customer-success", "jarvis-product-lead"),
+    ("jarvis-researcher", "jarvis-scout"),
+    ("jarvis-researcher", "jarvis-product-lead"),
+    ("jarvis-researcher", "jarvis-data-ml"),
+    ("jarvis-council-departments", "jarvis-council"),
+    ("jarvis-council-departments", "jarvis-manager"),
 ]
 
 # Map profile -> team
@@ -77,6 +126,7 @@ TEAM_MAP = {
     "jarvis-boss": "leadership",
     "jarvis-manager": "leadership",
     "jarvis-council": "leadership",
+    "jarvis-council-departments": "leadership",
     "jarvis-secretary": "operations",
     "jarvis-product-lead": "operations",
     "jarvis-engineering-lead": "engineering",
@@ -88,7 +138,28 @@ TEAM_MAP = {
     "jarvis": "default",
     "quant-boss": "quant",
     "poopmaster": "default",
+    # ── New specialist teams (D-2026-06-09) ───────────────────────────
+    "jarvis-frontend": "engineering",
+    "jarvis-ui_ux": "design",
+    "jarvis-backend": "engineering",
+    "jarvis-mobile": "engineering",
+    "jarvis-data-ml": "engineering",
+    "jarvis-devops": "engineering",
+    "jarvis-marketing": "growth",
+    "jarvis-sales": "growth",
+    "jarvis-finance": "operations",
+    "jarvis-legal": "operations",
+    "jarvis-customer-success": "operations",
+    "jarvis-researcher": "research",
 }
+
+
+# D-2026-06-09 (Phase 4, sub-task 4.0): single source of truth for the
+# known-profile allowlist. Both `backend/api/discord_gateway.py`
+# (Phase 3) and the Phase 4 Council of Departments must agree on
+# which jarvis profiles exist. Derived from TEAM_MAP so adding a new
+# profile to TEAM_MAP automatically updates the allowlist everywhere.
+KNOWN_PROFILES = frozenset(TEAM_MAP.keys())
 
 
 def _profile_path(slug: str) -> Optional[Path]:

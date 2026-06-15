@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api/client';
 import type { CatalogPayload, CatalogSkill } from '../types/dashboard';
 import { useProject } from '../contexts/ProjectContext';
+import { PROJECT_SCOPES, scopeColor, scopeLabel } from '../utils/projectScopes';
 import { PanelHeader } from './PanelHeader';
 
 // D-2026-06-14 (Skill Marketplace v3 — user feedback):
@@ -87,7 +88,14 @@ export function SkillMarketplace() {
   const [department, setDepartment] = useState<string>('all');
   const [trustFilter, setTrustFilter] = useState<'T1' | 'T2' | 'T3' | ''>('T1');
   const [targetAgent, setTargetAgent] = useState<string>('');
-  const [targetProject, setTargetProject] = useState<string>(activeProject);
+  // D-2026-06-14: target project for new imports defaults to
+  // global-hermes (the main Hermes folder on the user's machine) so
+  // anything imported from a GitHub repo lands at the installation
+  // level by default. The user can switch per-import.
+  const [targetProject, setTargetProject] = useState<string>(PROJECT_SCOPES.GLOBAL_HERMES);
+  // Once the user manually picks a scope, stop the auto-update effect
+  // from reverting it when the active chat project changes.
+  const hasUserPickedScope = useRef<boolean>(false);
   const [basket, setBasket] = useState<Set<string>>(new Set());
   const [saveStatus, setSaveStatus] = useState<string>('');
   const [error, setError] = useState<string>('');
@@ -145,7 +153,14 @@ export function SkillMarketplace() {
   }, []);
 
   useEffect(() => {
-    if (activeProject) setTargetProject(activeProject);
+    // D-2026-06-14: only auto-switch to active project on first
+    // mount. If the user has already picked a different scope
+    // (global-hermes, jarvis-war-room, custom), respect their choice.
+    // We track this with a ref so subsequent active-project changes
+    // don't blow away the user's selection.
+    if (activeProject && !hasUserPickedScope.current) {
+      setTargetProject(PROJECT_SCOPES.GLOBAL_HERMES);
+    }
   }, [activeProject]);
 
   // Pre-populate basket with the agent's current assignment
@@ -456,13 +471,66 @@ export function SkillMarketplace() {
             </select>
           </label>
           <label className="skill-mkt-control">
-            <span className="skill-mkt-label">Project</span>
-            <input
-              type="text"
-              value={targetProject}
-              onChange={(e) => setTargetProject(e.target.value)}
+            <span className="skill-mkt-label">
+              Project scope
+              <span
+                className="skill-mkt-scope-hint"
+                title={
+                  targetProject === PROJECT_SCOPES.GLOBAL_HERMES
+                    ? '🌍 Applies to the whole Hermes installation'
+                    : targetProject === PROJECT_SCOPES.JARVIS_WAR_ROOM
+                      ? '⚔ Scoped to the Jarvis War Room workspace'
+                      : targetProject === activeProject
+                        ? `📁 Scoped to current chat project: ${activeProject}`
+                        : 'Custom project slug'
+                }
+              >
+                ({scopeLabel(targetProject)})
+              </span>
+            </span>
+            {/* D-2026-06-14: 3 fixed scopes + custom. New imports
+                default to global-hermes so GitHub-repo skills land
+                at the Hermes installation level. */}
+            <select
+              value={
+                targetProject === PROJECT_SCOPES.GLOBAL_HERMES
+                || targetProject === PROJECT_SCOPES.JARVIS_WAR_ROOM
+                || targetProject === activeProject
+                  ? targetProject
+                  : '__custom__'
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                hasUserPickedScope.current = true;
+                if (v === '__custom__') {
+                  setTargetProject('');
+                } else {
+                  setTargetProject(v);
+                }
+              }}
               data-testid="skill-mkt-target-project"
-            />
+              className="skill-mkt-scope-select"
+            >
+              <option value={PROJECT_SCOPES.GLOBAL_HERMES}>🌍 Global Hermes (installation-wide)</option>
+              <option value={PROJECT_SCOPES.JARVIS_WAR_ROOM}>⚔ Jarvis War Room (war-room-wide)</option>
+              <option value={activeProject}>📁 {activeProject} (active project)</option>
+              <option value="__custom__">Custom…</option>
+            </select>
+            {/* Show a free-form input when "Custom…" is picked */}
+            {(targetProject !== PROJECT_SCOPES.GLOBAL_HERMES
+              && targetProject !== PROJECT_SCOPES.JARVIS_WAR_ROOM
+              && targetProject !== activeProject) && (
+              <input
+                type="text"
+                placeholder="custom project slug"
+                value={targetProject}
+                onChange={(e) => {
+                  hasUserPickedScope.current = true;
+                  setTargetProject(e.target.value);
+                }}
+                data-testid="skill-mkt-target-project-custom"
+              />
+            )}
           </label>
           <div className="skill-mkt-assign-actions">
             <button

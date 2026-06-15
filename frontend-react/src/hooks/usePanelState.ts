@@ -55,7 +55,7 @@ export function usePanelState(panelId: string, defaultCollapsed = false): PanelS
   // Track whether we've read from localStorage yet (so we don't
   // write the default back on mount, which would clobber the saved
   // value if storage was modified between render and effect).
-  const [persisted, setPersisted] = useState<boolean>(() =>
+  const [persisted] = useState<boolean>(() =>
     typeof window !== "undefined"
   );
 

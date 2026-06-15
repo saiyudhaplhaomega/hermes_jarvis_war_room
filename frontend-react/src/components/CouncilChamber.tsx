@@ -7,6 +7,13 @@ export function CouncilChamber() {
   const councilAgents = agents.filter((a) => /boss|manager|council|security|engineering/i.test(a.name));
   const runningCount = councilAgents.filter((a) => ['online', 'active', 'running'].includes((a.status || '').toLowerCase())).length;
   const decisions = cache?.decisions || [];
+  const topology = cache?.topology || {};
+  const humanGates = cache?.human_gates || { pending: [], audit_count: 0 };
+  const topologyCompanies = topology.companies?.length || 0;
+  const topologyTeams = topology.teams?.length || 0;
+  const topologyEdges = topology.edges?.length || 0;
+  const pendingGates = humanGates.pending?.length || 0;
+  const auditCount = humanGates.audit_count || 0;
 
   return (
     <div className="card">
@@ -24,8 +31,10 @@ export function CouncilChamber() {
             </div>
           );
         })}
-        <div className="text-xs text-gray-500 pt-2 border-t border-jarvis-border">
-          Decision records visible: {decisions.length}. Live escalation queue: not yet connected.
+        <div className="text-xs text-gray-500 pt-2 border-t border-jarvis-border space-y-1" data-testid="council-chamber-summary">
+          <div>Decision records visible: <span className="text-cyan-300">{decisions.length}</span>.</div>
+          <div>Topology: <span className="text-cyan-300">{topologyCompanies}</span> company · <span className="text-cyan-300">{topologyTeams}</span> teams · <span className="text-cyan-300">{topologyEdges}</span> edges</div>
+          <div>Human gates: <span className={pendingGates ? 'text-amber-300' : 'text-emerald-300'}>{pendingGates}</span> pending · <span className="text-gray-400">{auditCount}</span> audit entries</div>
         </div>
       </div>
     </div>

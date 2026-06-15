@@ -82,7 +82,17 @@ def _available_agents() -> list[dict]:
         except Exception:
             cfg = {}
         profile = cfg.get("profile") or {}
-        model = cfg.get("model") or {}
+        # D-2026-06-09 fix: model may be a string (existing schema, e.g.
+        # `model: codex`) or a dict (`model: {provider, default}`). Handle
+        # both. The new Hermes profile generator (scripts/gen_hermes_profiles.py)
+        # emits the string form for compatibility with the existing 8 profiles.
+        raw_model = cfg.get("model")
+        if isinstance(raw_model, dict):
+            model = raw_model
+        elif isinstance(raw_model, str):
+            model = {"provider": raw_model, "default": raw_model}
+        else:
+            model = {}
         name = profile.get("name") or p.name
         agents.append({
             "name": name,

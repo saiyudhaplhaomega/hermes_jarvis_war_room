@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Observability Dashboard — Hermes Jarvis War Room</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --ink: #f8fafc;
+      --ink-secondary: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0ea5e9;
+      --danger: #ef4444;
+      --success: #10b981;
+      --border: #334155;
+      --radius: 8px;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+    
+    .header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+    
+    .filters {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+    
+    .filter {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    
+    .filter.active {
+      background: var(--accent);
+      color: var(--ink);
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .stat-card .label {
+      font-size: 0.75rem;
+      color: var(--ink-secondary);
+    }
+    
+    .stat-card .value {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+    
+    .stat-card .change {
+      font-size: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+    
+    .stat-card .change.positive {
+      color: var(--success);
+    }
+    
+    .stat-card .change.negative {
+      color: var(--danger);
+    }
+    
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 1rem;
+    }
+    
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+    }
+    
+    .chart-card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    
+    .agent-list {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      margin-top: 2rem;
+    }
+    
+    .agent-list h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    
+    .agent-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.875rem;
+    }
+    
+    .agent-row:last-child {
+      border-bottom: none;
+    }
+    
+    .agent-row .name {
+      font-weight: 600;
+    }
+    
+    .agent-row .status {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      text-align: center;
+    }
+    
+    .agent-row .status.active { background: var(--success); color: var(--ink); }
+    .agent-row .status.idle { background: var(--border); color: var(--ink-secondary); }
+    .agent-row .status.error { background: var(--danger); color: var(--ink); }
+    
+    .tweaks {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+    }
+    
+    .tweaks label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>Observability Dashboard</h1>
+      <div class="filters">
+        <div class="filter active" data-filter="all">All Time</div>
+        <div class="filter" data-filter="24h">Last 24h</div>
+        <div class="filter" data-filter="7d">Last 7d</div>
+        <div class="filter" data-filter="30d">Last 30d</div>
+      </div>
+    </div>
+    
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="label">Total Agents</div>
+        <div class="value">13</div>
+        <div class="change positive">
+          <span>↑ 2</span> from last week
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Total Runs</div>
+        <div class="value">1,248</div>
+        <div class="change positive">
+          <span>↑ 12%</span> from last week
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Tokens Used</div>
+        <div class="value">4.2M</div>
+        <div class="change negative">
+          <span>↓ 5%</span> from last week
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="label">API Calls</div>
+        <div class="value">8,765</div>
+        <div class="change positive">
+          <span>↑ 8%</span> from last week
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Errors</div>
+        <div class="value">42</div>
+        <div class="change negative">
+          <span>↓ 3</span> from last week
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Avg Runtime</div>
+        <div class="value">42s</div>
+        <div class="change positive">
+          <span>↑ 2s</span> from last week
+        </div>
+      </div>
+    </div>
+    
+    <!-- Charts Grid -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h2>Tokens Used Over Time</h2>
+        <canvas id="tokensChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h2>Agent Runs Over Time</h2>
+        <canvas id="runsChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h2>API Calls by Agent</h2>
+        <canvas id="apiCallsChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h2>Error Rate Over Time</h2>
+        <canvas id="errorChart"></canvas>
+      </div>
+    </div>
+    
+    <!-- Agent List -->
+    <div class="agent-list">
+      <h2>Agent Status</h2>
+      <div class="agent-row" style="font-weight: 600; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem;">
+        <div>Name</div>
+        <div>Status</div>
+        <div>Tokens Used</div>
+        <div>API Calls</div>
+        <div>Runtime</div>
+      </div>
+      <div class="agent-row">
+        <div class="name">Researcher-001</div>
+        <div class="status active">Active</div>
+        <div>1.2M</div>
+        <div>2,456</div>
+        <div>32s</div>
+      </div>
+      <div class="agent-row">
+        <div class="name">Writer-002</div>
+        <div class="status idle">Idle</div>
+        <div>890K</div>
+        <div>1,872</div>
+        <div>28s</div>
+      </div>
+      <div class="agent-row">
+        <div class="name">Manager-003</div>
+        <div class="status active">Active</div>
+        <div>1.5M</div>
+        <div>3,102</div>
+        <div>45s</div>
+      </div>
+      <div class="agent-row">
+        <div class="name">Engineer-004</div>
+        <div class="status error">Error</div>
+        <div>650K</div>
+        <div>1,345</div>
+        <div>22s</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tweaks Panel -->
+  <div class="tweaks">
+    <label>
+      <input type="checkbox" id="showCharts" checked>
+      Show charts
+    </label>
+    <label>
+      <input type="checkbox" id="showAgentList" checked>
+      Show agent list
+    </label>
+  </div>
+
+  <script>
+    // Chart.js Configuration
+    const ctxTokens = document.getElementById('tokensChart').getContext('2d');
+    const tokensChart = new Chart(ctxTokens, {
+      type: 'line',
+      data: {
+        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        datasets: [{
+          label: 'Tokens Used',
+          data: [1200000, 1350000, 1400000, 1500000, 1600000, 1550000, 1450000],
+          borderColor: 'rgba(56, 191, 248, 1)',
+          backgroundColor: 'rgba(56, 191, 248, 0.1)',
+          tension: 0.3,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          y: {
+            beginAtZero: false,
+            ticks: {
+              callback: function(value) {
+                return value / 1000000 + 'M';
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    const ctxRuns = document.getElementById('runsChart').getContext('2d');
+    const runsChart = new Chart(ctxRuns, {
+      type: 'bar',
+      data: {
+        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        datasets: [{
+          label: 'Agent Runs',
+          data: [180, 200, 220, 210, 230, 200, 190],
+          backgroundColor: 'rgba(56, 191, 248, 0.5)',
+          borderColor: 'rgba(56, 191, 248, 1)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+    
+    const ctxApiCalls = document.getElementById('apiCallsChart').getContext('2d');
+    const apiCallsChart = new Chart(ctxApiCalls, {
+      type: 'doughnut',
+      data: {
+        labels: ['Researcher-001', 'Writer-002', 'Manager-003', 'Engineer-004'],
+        datasets: [{
+          data: [2456, 1872, 3102, 1345],
+          backgroundColor: [
+            'rgba(56, 191, 248, 0.7)',
+            'rgba(16, 185, 129, 0.7)',
+            'rgba(239, 68, 68, 0.7)',
+            'rgba(161, 98, 7, 0.7)'
+          ],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'right' }
+        }
+      }
+    });
+    
+    const ctxError = document.getElementById('errorChart').getContext('2d');
+    const errorChart = new Chart(ctxError, {
+      type: 'line',
+      data: {
+        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        datasets: [{
+          label: 'Error Rate',
+          data: [2, 1, 3, 0, 2, 1, 0],
+          borderColor: 'rgba(239, 68, 68, 1)',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          tension: 0.3,
+          fill: true
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+    
+    // Filters
+    document.querySelectorAll('.filter').forEach(filter => {
+      filter.addEventListener('click', () => {
+        document.querySelectorAll('.filter').forEach(f => f.classList.remove('active'));
+        filter.classList.add('active');
+        // Update charts/data based on filter (simplified for demo)
+      });
+    });
+    
+    // Tweaks
+    document.getElementById('showCharts').addEventListener('change', (e) => {
+      document.querySelectorAll('.chart-card').forEach(card => {
+        card.style.display = e.target.checked ? 'block' : 'none';
+      });
+    });
+    
+    document.getElementById('showAgentList').addEventListener('change', (e) => {
+      document.querySelector('.agent-list').style.display = e.target.checked ? 'block' : 'none';
+    });
+  </script>
+</body>
+</html>

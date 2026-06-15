@@ -12,7 +12,7 @@
  *   - Edges are SVG lines
  *   - Health dots (green/yellow/red) come from agent.status
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api, type TopologyNode, type TopologyEdge, type TopologyAgent } from '../api/client';
 
 interface Props {

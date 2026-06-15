@@ -185,14 +185,25 @@ export function RoleMatrixSkillFeed({
   onChange: (agent: string, skills: string[]) => void;
 }) {
   const sorted = useMemo(() => sortAgents(agentNames), [agentNames]);
-  const [selectedAgent, setSelectedAgent] = useState<string>(sorted[0] || '');
+
+  // ALSO include any agent that already has saved assignments, so users
+  // can see + edit skill assignments for agents that may not be in the
+  // current roles payload (e.g. orchestrator / boss which live in the
+  // dashboard cache but not in /roles).
+  const sortedWithSaved = useMemo(() => {
+    const fromSaved = currentAssignments.map((a) => a.agent);
+    const combined = Array.from(new Set([...agentNames, ...fromSaved]));
+    return sortAgents(combined);
+  }, [agentNames, currentAssignments]);
+
+  const [selectedAgent, setSelectedAgent] = useState<string>(sortedWithSaved[0] || '');
 
   // Keep the selected agent valid when the list changes
   useEffect(() => {
-    if (!sorted.includes(selectedAgent) && sorted.length) {
-      setSelectedAgent(sorted[0]);
+    if (!sortedWithSaved.includes(selectedAgent) && sortedWithSaved.length) {
+      setSelectedAgent(sortedWithSaved[0]);
     }
-  }, [sorted, selectedAgent]);
+  }, [sortedWithSaved, selectedAgent]);
 
   const currentSkills = useMemo(
     () => currentAssignments.find((a) => a.agent === selectedAgent)?.skills || [],
@@ -210,8 +221,8 @@ export function RoleMatrixSkillFeed({
             data-testid="rm-skill-feed-agent-select"
             aria-label="Agent to assign skills to"
           >
-            {sorted.length === 0 && <option value="">(no agents loaded)</option>}
-            {sorted.map((a) => (
+            {sortedWithSaved.length === 0 && <option value="">(no agents loaded)</option>}
+            {sortedWithSaved.map((a) => (
               <option key={a} value={a}>{a}</option>
             ))}
           </select>

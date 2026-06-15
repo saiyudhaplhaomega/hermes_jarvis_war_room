@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tool Marketplace — Hermes Jarvis War Room</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --ink: #f8fafc;
+      --ink-secondary: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0ea5e9;
+      --danger: #ef4444;
+      --success: #10b981;
+      --border: #334155;
+      --radius: 8px;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+    }
+    
+    .header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+    
+    .search-bar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem 1rem;
+      width: 300px;
+      font-size: 0.875rem;
+    }
+    
+    .tabs {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .tab {
+      padding: 0.5rem 0;
+      font-size: 0.875rem;
+      color: var(--ink-secondary);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    
+    .tool-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+    
+    .tool-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .tool-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .tool-card .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .tool-card .icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    
+    .tool-card .name {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    
+    .tool-card .category {
+      font-size: 0.75rem;
+      color: var(--ink-secondary);
+      background: var(--border);
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      align-self: flex-start;
+    }
+    
+    .tool-card .description {
+      font-size: 0.75rem;
+      color: var(--ink-secondary);
+      flex-grow: 1;
+    }
+    
+    .tool-card .actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .tool-card .btn {
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius);
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: background 0.2s;
+    }
+    
+    .tool-card .btn.install {
+      background: var(--accent);
+      color: var(--ink);
+    }
+    
+    .tool-card .btn.install:hover {
+      background: var(--accent-hover);
+    }
+    
+    .tool-card .btn.uninstall {
+      background: var(--border);
+      color: var(--ink);
+    }
+    
+    .tool-card .btn.uninstall:hover {
+      background: var(--ink-secondary);
+    }
+    
+    .tweaks {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+    }
+    
+    .tweaks label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>Tool Marketplace</h1>
+      <input type="text" class="search-bar" placeholder="Search tools..." id="searchBar">
+    </div>
+    
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab active" data-tab="all">All</div>
+      <div class="tab" data-tab="productivity">Productivity</div>
+      <div class="tab" data-tab="development">Development</div>
+      <div class="tab" data-tab="research">Research</div>
+      <div class="tab" data-tab="social">Social</div>
+    </div>
+    
+    <!-- Tool Grid -->
+    <div class="tool-grid" id="toolGrid">
+      <!-- Tools will be added here dynamically -->
+    </div>
+  </div>
+
+  <!-- Tweaks Panel -->
+  <div class="tweaks">
+    <label>
+      <input type="checkbox" id="showDescriptions" checked>
+      Show descriptions
+    </label>
+    <label>
+      <input type="checkbox" id="showCategories" checked>
+      Show categories
+    </label>
+  </div>
+
+  <script>
+    // Tool Data
+    const tools = [
+      { name: "Google Search", category: "Research", description: "Search the web for information using Google.", icon: "G", installed: false },
+      { name: "Web Scraper", category: "Research", description: "Extract content from web pages.", icon: "W", installed: false },
+      { name: "GitHub", category: "Development", description: "Interact with GitHub repositories, issues, and PRs.", icon: "G", installed: true },
+      { name: "VS Code", category: "Development", description: "Write, debug, and optimize code in VS Code.", icon: "V", installed: false },
+      { name: "Notion", category: "Productivity", description: "Create and manage documents in Notion.", icon: "N", installed: true },
+      { name: "Jira", category: "Productivity", description: "Manage tasks and projects in Jira.", icon: "J", installed: false },
+      { name: "Twitter", category: "Social", description: "Post and interact on Twitter.", icon: "T", installed: false },
+      { name: "Slack", category: "Social", description: "Send messages and manage channels in Slack.", icon: "S", installed: true },
+      { name: "Grammarly", category: "Productivity", description: "Check grammar and style in written content.", icon: "G", installed: false },
+      { name: "Tableau", category: "Research", description: "Visualize and analyze data in Tableau.", icon: "T", installed: false }
+    ];
+    
+    // Render Tools
+    function renderTools(filter = 'all') {
+      const grid = document.getElementById('toolGrid');
+      grid.innerHTML = '';
+      
+      const filteredTools = filter === 'all' ? tools : tools.filter(tool => tool.category.toLowerCase() === filter);
+      
+      filteredTools.forEach(tool => {
+        const card = document.createElement('div');
+        card.className = 'tool-card';
+        card.innerHTML = `
+          <div class="header">
+            <div class="icon">${tool.icon}</div>
+            <div class="name">${tool.name}</div>
+          </div>
+          ${document.getElementById('showCategories').checked ? `<div class="category">${tool.category}</div>` : ''}
+          ${document.getElementById('showDescriptions').checked ? `<div class="description">${tool.description}</div>` : ''}
+          <div class="actions">
+            <button class="btn ${tool.installed ? 'uninstall' : 'install'}">
+              ${tool.installed ? 'Uninstall' : 'Install'}
+            </button>
+          </div>
+        `;
+        
+        card.querySelector('.btn').addEventListener('click', () => {
+          tool.installed = !tool.installed;
+          renderTools(filter);
+        });
+        
+        grid.appendChild(card);
+      });
+    }
+    
+    // Search
+    document.getElementById('searchBar').addEventListener('input', (e) => {
+      const searchTerm = e.target.value.toLowerCase();
+      const filteredTools = tools.filter(tool =>
+        tool.name.toLowerCase().includes(searchTerm) ||
+        tool.description.toLowerCase().includes(searchTerm)
+      );
+      
+      const grid = document.getElementById('toolGrid');
+      grid.innerHTML = '';
+      
+      filteredTools.forEach(tool => {
+        const card = document.createElement('div');
+        card.className = 'tool-card';
+        card.innerHTML = `
+          <div class="header">
+            <div class="icon">${tool.icon}</div>
+            <div class="name">${tool.name}</div>
+          </div>
+          ${document.getElementById('showCategories').checked ? `<div class="category">${tool.category}</div>` : ''}
+          ${document.getElementById('showDescriptions').checked ? `<div class="description">${tool.description}</div>` : ''}
+          <div class="actions">
+            <button class="btn ${tool.installed ? 'uninstall' : 'install'}">
+              ${tool.installed ? 'Uninstall' : 'Install'}
+            </button>
+          </div>
+        `;
+        
+        card.querySelector('.btn').addEventListener('click', () => {
+          tool.installed = !tool.installed;
+          renderTools(document.querySelector('.tab.active').dataset.tab);
+        });
+        
+        grid.appendChild(card);
+      });
+    });
+    
+    // Tabs
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        renderTools(tab.dataset.tab);
+      });
+    });
+    
+    // Tweaks
+    document.getElementById('showDescriptions').addEventListener('change', () => {
+      renderTools(document.querySelector('.tab.active').dataset.tab);
+    });
+    
+    document.getElementById('showCategories').addEventListener('change', () => {
+      renderTools(document.querySelector('.tab.active').dataset.tab);
+    });
+    
+    // Initial Render
+    renderTools();
+  </script>
+</body>
+</html>

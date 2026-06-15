@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import type { DashboardCache } from '../types/dashboard';
 import { api } from '../api/client';
+import { errorMessage } from '../utils/config';
 
 interface DashboardCtx {
   cache: DashboardCache | null;
@@ -10,6 +11,12 @@ interface DashboardCtx {
 }
 
 const Ctx = createContext<DashboardCtx | null>(null);
+
+// D-2026-06-09 (post-sprint cleanup): export the context object so
+// tests can mount providers in arbitrary compositions (e.g.
+// `<DashboardContext.Provider value={...}>`). Matches the pattern
+// already used by KanbanContext.tsx and ProjectContext.tsx.
+export const DashboardContext = Ctx;
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [cache, setCache] = useState<DashboardCache | null>(null);
@@ -31,8 +38,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         return newTime >= prevTime ? res : prev;
       });
       setError(null);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(errorMessage(e));
     } finally {
       setLoading(false);
     }

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Task Queue — Hermes Jarvis War Room</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --ink: #f8fafc;
+      --ink-secondary: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0ea5e9;
+      --danger: #ef4444;
+      --success: #10b981;
+      --border: #334155;
+      --radius: 8px;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 1rem;
+    }
+    
+    .sidebar {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1rem;
+      border: 1px solid var(--border);
+    }
+    
+    .sidebar h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .task-templates {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .task-template {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem;
+      cursor: grab;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      transition: background 0.2s;
+    }
+    
+    .task-template:hover {
+      background: var(--border);
+    }
+    
+    .task-template .name {
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    
+    .task-template .description {
+      font-size: 0.75rem;
+      color: var(--ink-secondary);
+    }
+    
+    .canvas {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 1rem;
+      border: 1px solid var(--border);
+      min-height: 80vh;
+      position: relative;
+    }
+    
+    .canvas h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    
+    .queue {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    .task {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      cursor: grab;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      position: relative;
+    }
+    
+    .task.dragging {
+      opacity: 0.5;
+    }
+    
+    .task .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .task .name {
+      font-weight: 600;
+      font-size: 0.875rem;
+    }
+    
+    .task .status {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      background: var(--border);
+      color: var(--ink-secondary);
+    }
+    
+    .task .status.pending { background: var(--border); color: var(--ink-secondary); }
+    .task .status.in-progress { background: var(--accent); color: var(--ink); }
+    .task .status.completed { background: var(--success); color: var(--ink); }
+    
+    .task .description {
+      font-size: 0.75rem;
+      color: var(--ink-secondary);
+    }
+    
+    .task .subtasks {
+      margin-top: 0.5rem;
+      padding-left: 1rem;
+      border-left: 2px solid var(--border);
+    }
+    
+    .subtask {
+      font-size: 0.75rem;
+      color: var(--ink-secondary);
+      margin-bottom: 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .subtask input[type="checkbox"] {
+      accent-color: var(--accent);
+    }
+    
+    .add-subtask {
+      font-size: 0.75rem;
+      color: var(--accent);
+      cursor: pointer;
+      margin-top: 0.25rem;
+    }
+    
+    .tweaks {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+    }
+    
+    .tweaks label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    @media (max-width: 768px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Sidebar: Task Templates -->
+    <div class="sidebar">
+      <h2>Task Templates</h2>
+      <div class="task-templates" id="taskTemplates">
+        <div class="task-template" draggable="true" data-task='{"name": "Research Competitors", "description": "Gather data on 5 competitors in the multi-agent space.", "subtasks": ["Identify competitors", "Analyze features", "Summarize findings"]}'>
+          <div class="name">Research Competitors</div>
+          <div class="description">Gather data on 5 competitors in the multi-agent space.</div>
+        </div>
+        <div class="task-template" draggable="true" data-task='{"name": "Write Blog Post", "description": "Draft a blog post comparing Hermes Jarvis to CrewAI.", "subtasks": ["Outline post", "Write introduction", "Add feature comparison", "Publish"]}'>
+          <div class="name">Write Blog Post</div>
+          <div class="description">Draft a blog post comparing Hermes Jarvis to CrewAI.</div>
+        </div>
+        <div class="task-template" draggable="true" data-task='{"name": "Refactor ACL Module", "description": "Split acl.py into smaller modules for better maintainability.", "subtasks": ["Audit current ACL logic", "Design new module structure", "Implement changes", "Write tests"]}'>
+          <div class="name">Refactor ACL Module</div>
+          <div class="description">Split acl.py into smaller modules for better maintainability.</div>
+        </div>
+        <div class="task-template" draggable="true" data-task='{"name": "Add Role-Based Agents", "description": "Implement role-based agents (Researcher, Writer, Manager).", "subtasks": ["Design role schema", "Update agent creation API", "Add role assignment UI", "Test with sample agents"]}'>
+          <div class="name">Add Role-Based Agents</div>
+          <div class="description">Implement role-based agents (Researcher, Writer, Manager).</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Canvas: Task Queue -->
+    <div class="canvas" id="canvas">
+      <h2>Dynamic Task Queue</h2>
+      <div class="queue" id="queue">
+        <!-- Tasks will be added here dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Tweaks Panel -->
+  <div class="tweaks">
+    <label>
+      <input type="checkbox" id="snapToGrid" checked>
+      Snap to grid
+    </label>
+    <label>
+      <input type="checkbox" id="showSubtasks" checked>
+      Show subtasks
+    </label>
+  </div>
+
+  <script>
+    // Drag-and-Drop Logic
+    let draggedItem = null;
+    
+    // Task Templates
+    document.querySelectorAll('.task-template').forEach(item => {
+      item.addEventListener('dragstart', (e) => {
+        draggedItem = e.target;
+        setTimeout(() => {
+          e.target.style.opacity = '0.5';
+        }, 0);
+      });
+      
+      item.addEventListener('dragend', (e) => {
+        e.target.style.opacity = '1';
+        if (e.dataTransfer.dropEffect === 'copy') {
+          const task = JSON.parse(e.target.dataset.task);
+          addTaskToQueue(task);
+        }
+      });
+    });
+    
+    // Canvas
+    const canvas = document.getElementById('canvas');
+    canvas.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    });
+    
+    // Queue
+    const queue = document.getElementById('queue');
+    
+    function addTaskToQueue(task) {
+      const taskElement = document.createElement('div');
+      taskElement.className = 'task';
+      taskElement.draggable = true;
+      taskElement.innerHTML = `
+        <div class="header">
+          <div class="name">${task.name}</div>
+          <div class="status pending">Pending</div>
+        </div>
+        <div class="description">${task.description}</div>
+        <div class="subtasks">
+          ${task.subtasks.map(subtask => `
+            <div class="subtask">
+              <input type="checkbox" ${Math.random() > 0.5 ? 'checked' : ''}>
+              <span>${subtask}</span>
+            </div>
+          `).join('')}
+        </div>
+        <div class="add-subtask">+ Add Subtask</div>
+      `;
+      
+      taskElement.addEventListener('dragstart', (e) => {
+        draggedItem = taskElement;
+        taskElement.classList.add('dragging');
+        e.dataTransfer.setData('text/plain', ''); // Required for Firefox
+      });
+      
+      taskElement.addEventListener('dragend', () => {
+        taskElement.classList.remove('dragging');
+      });
+      
+      taskElement.querySelector('.add-subtask').addEventListener('click', () => {
+        const subtask = prompt('Enter subtask description:');
+        if (subtask) {
+          const subtaskElement = document.createElement('div');
+          subtaskElement.className = 'subtask';
+          subtaskElement.innerHTML = `
+            <input type="checkbox">
+            <span>${subtask}</span>
+          `;
+          taskElement.querySelector('.subtasks').appendChild(subtaskElement);
+        }
+      });
+      
+      queue.appendChild(taskElement);
+    }
+    
+    // Drag Tasks in Queue
+    queue.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      const afterElement = getDragAfterElement(queue, e.clientY);
+      if (afterElement) {
+        queue.insertBefore(draggedItem, afterElement);
+      } else {
+        queue.appendChild(draggedItem);
+      }
+    });
+    
+    function getDragAfterElement(container, y) {
+      const draggableElements = [...container.querySelectorAll('.task:not(.dragging)')];
+      return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+          return { offset, element: child };
+        } else {
+          return closest;
+        }
+      }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+    
+    // Tweaks
+    document.getElementById('showSubtasks').addEventListener('change', (e) => {
+      document.querySelectorAll('.subtasks').forEach(el => {
+        el.style.display = e.target.checked ? 'block' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>

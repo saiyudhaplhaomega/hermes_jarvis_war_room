@@ -9,6 +9,37 @@ sys.path.insert(0, str(BACKEND))
 
 
 def _load_app(monkeypatch, tmp_path):
+    # D-2026-06-09 (post-sprint cleanup): seed a synthetic `jarvis`
+    # profile dir in the temp HERMES_PROFILES_DIR so the legacy tests
+    # (which use `agent="jarvis"`) can resolve. The 5 pre-existing
+    # failures from Phase 1's registry rename (no `jarvis/` dir on
+    # the live filesystem) are now fixed by giving the test a
+    # minimal stub dir for it.
+    profiles_dir = tmp_path / "profiles"
+    profiles_dir.mkdir(parents=True, exist_ok=True)
+    (profiles_dir / "jarvis").mkdir(parents=True, exist_ok=True)
+    (profiles_dir / "jarvis" / "config.yaml").write_text(
+        "name: jarvis\n"
+        "role: orchestrator\n"
+        "model:\n"
+        "  provider: codex\n"
+        "  model: gpt-5.5\n"
+    )
+    # Seed a single SKILL.md so the skill inventory is non-empty for
+    # tests that grab `skills[0]["name"]` (D-2026-06-09 post-sprint cleanup).
+    skill_dir = profiles_dir / "jarvis" / "skills" / "sample-skill"
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    (skill_dir / "SKILL.md").write_text(
+        "---\n"
+        "name: sample-skill\n"
+        "description: stub skill for tests\n"
+        "category: testing\n"
+        "---\n\n"
+        "# sample-skill\n\nA stub skill used by the legacy test_agent_growth_api tests.\n"
+    )
+    monkeypatch.setenv("HERMES_PROFILES_DIR", str(profiles_dir))
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "hermes"))
+
     monkeypatch.setenv("JARVIS_DASHBOARD_AGENT_SKILLS", str(tmp_path / "agent_skill_assignments.json"))
     monkeypatch.setenv("JARVIS_DASHBOARD_AGENT_PROPOSALS", str(tmp_path / "agent_proposals.json"))
     monkeypatch.setenv("JARVIS_DASHBOARD_REMOVED_AGENTS", str(tmp_path / "removed_agents.json"))
@@ -16,7 +47,7 @@ def _load_app(monkeypatch, tmp_path):
     monkeypatch.setenv("JARVIS_DASHBOARD_DEV_TOKEN", "test-token")
     monkeypatch.setenv("JARVIS_DASHBOARD_QUERY_TOKEN_FALLBACK", "1")
     for name in list(sys.modules):
-        if name == "server" or name.startswith("api.agent_growth") or name.startswith("api.roles"):
+        if name == "server" or name == "core.config" or name.startswith("api.agent_growth") or name.startswith("api.roles"):
             sys.modules.pop(name, None)
     import server
     return server.app

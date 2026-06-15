@@ -286,7 +286,12 @@ export function RoleMatrix() {
         </div>
       </div>
 
-      <div className="mb-4 overflow-x-auto">
+      <div
+        className="mb-4 overflow-x-auto rounded-lg border border-white/5"
+        data-testid="role-table-scroll"
+        role="region"
+        aria-label="Role assignments table (scrolls horizontally on narrow screens)"
+      >
         <table className="w-full text-xs role-table">
           <thead>
             <tr className="mono text-gray-500 uppercase tracking-widest text-[10px]">
@@ -343,14 +348,30 @@ export function RoleMatrix() {
         </table>
       </div>
 
-      <div className="agent-growth-grid">
-        <section className="growth-panel">
-          <div className="flex items-center justify-between gap-2 mb-2">
+      {/* ── Bootstrap-style row of 3 sub-sections, no nesting ──────
+         D-2026-06-14: replaced the 3-col rigid grid that forced
+         horizontal overflow on narrow cards. New layout: 1 col on
+         mobile, 2 on md, 3 on lg+. Each section has min-w-0 so
+         children can shrink instead of blowing out the card.
+         The "Add Agent" CTA is now a sticky-top banner above its
+         own form so it's never hidden. */}
+      <div className="row-of-sections">
+        {/* ── Skill Feed (col 1) ───────────────────────────────── */}
+        <section className="growth-section" data-testid="growth-section-skill-feed">
+          <div className="growth-section-head">
             <div>
-              <div className="font-semibold text-gray-100">Skill Feed</div>
-              <div className="text-[11px] text-gray-400">Pick an agent, then search and tick the skills you want. Selected skills appear as chips below the input.</div>
+              <div className="growth-section-title">🎯 Skill Feed</div>
+              <div className="growth-section-sub">Pick an agent, then search and tick the skills. Selected skills appear as chips below the input.</div>
             </div>
-            <button type="button" className="premium-button" onClick={saveSkills} disabled={savingSkills}>{savingSkills ? 'Saving...' : 'Save skills'}</button>
+            <button
+              type="button"
+              className="premium-button shrink-0"
+              onClick={saveSkills}
+              disabled={savingSkills}
+              data-testid="growth-save-skills"
+            >
+              {savingSkills ? 'Saving…' : 'Save skills'}
+            </button>
           </div>
           <RoleMatrixSkillFeed
             agentNames={agentNames}
@@ -366,76 +387,140 @@ export function RoleMatrix() {
           />
         </section>
 
-        <section className="growth-panel">
-          <div className="font-semibold text-gray-100">Add Agent Proposal</div>
-          <div className="text-[11px] text-gray-400 mb-3">Creates a proposal preview only. Real profile creation stays human-gated.</div>
+        {/* ── Add Agent (col 2) ────────────────────────────────── */}
+        <section className="growth-section" data-testid="growth-section-add-agent">
+          {/* Sticky CTA: always visible regardless of scroll position
+              inside the panel. This is the "Add Agent" the user said
+              was hidden in the previous layout. */}
+          <div className="growth-section-sticky-cta">
+            <div>
+              <div className="growth-section-title">➕ Add Agent</div>
+              <div className="growth-section-sub">Propose a new agent. Profile creation stays human-gated.</div>
+            </div>
+            <button
+              type="button"
+              className="premium-button shrink-0"
+              onClick={proposeAgent}
+              disabled={proposing || !proposalDraft || !proposalDraft.agent_name || !proposalDraft.provider || !proposalDraft.model}
+              data-testid="growth-propose-agent"
+              title={!proposalDraft?.agent_name ? 'Type a name first' : !proposalDraft?.provider ? 'Pick a provider' : !proposalDraft?.model ? 'Pick a model' : 'Submit proposal'}
+            >
+              {proposing ? 'Proposing…' : 'Add Agent'}
+            </button>
+          </div>
           {proposalDraft ? (
             <div className="growth-form">
-              <input value={proposalDraft.agent_name} onChange={event => setProposalField('agent_name', safeSlug(event.target.value).startsWith('jarvis-') ? safeSlug(event.target.value) : `jarvis-${safeSlug(event.target.value)}`)} placeholder="jarvis-new-agent" />
-              <input value={proposalDraft.description} onChange={event => setProposalField('description', event.target.value)} placeholder="agent description" />
-              <select value={proposalDraft.clone_from} onChange={event => setProposalField('clone_from', event.target.value)}>
-                {agentNames.map(name => <option key={name} value={name}>{`clone from ${name}`}</option>)}
-              </select>
-              <select value={proposalDraft.provider} onChange={event => setProposalField('provider', event.target.value)}>
-                <option value="">Provider</option>
-                {providers.map(provider => <option key={provider} value={provider}>{provider}</option>)}
-              </select>
-              <select value={proposalDraft.model} onChange={event => setProposalField('model', event.target.value)}>
-                <option value="">Model</option>
-                {modelOptions(proposalDraft.provider).map(model => <option key={model} value={model}>{model}</option>)}
-              </select>
-              <textarea value={proposalDraft.notes} onChange={event => setProposalField('notes', event.target.value)} placeholder="why this agent should exist" rows={3} />
-              <RoleMatrixSkillPicker
-                skills={skills}
-                selected={proposalDraft.skills}
-                onToggle={(name, on) => {
-                  setProposalDraftField('skills', on
-                    ? Array.from(new Set([...(proposalDraft.skills || []), name]))
-                    : (proposalDraft.skills || []).filter(n => n !== name));
-                }}
-                placeholder={`Search ${skills.length} skills to add to the new agent…`}
-                emptyMessage="No skills match. Try a different search term."
-              />
-              <button type="button" className="premium-button" onClick={proposeAgent} disabled={proposing || !proposalDraft.agent_name || !proposalDraft.provider || !proposalDraft.model}>
-                {proposing ? 'Proposing...' : 'Propose agent'}
-              </button>
-            </div>
-          ) : <div className="text-xs text-gray-500">Proposal form loading...</div>}
-          <div className="mt-3 space-y-2">
-            {proposals.slice(0, 6).map(proposal => (
-              <div key={proposal.proposal_id} className="proposal-card">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-gray-100">{proposal.request.agent_name}</span>
-                  <span className="mono text-[10px] text-amber-300">{proposal.status}</span>
-                </div>
-                <div className="text-[11px] text-gray-400">{proposal.request.provider} / {proposal.request.model}</div>
-                <div className="text-[11px] text-emerald-300">No profile directory created.</div>
-                <button type="button" className="danger-button mt-2" onClick={() => { setPendingRemove(proposal); setRemoveReason(''); }}>
-                  Remove with 7-day backup
-                </button>
+              <label className="growth-form-field">
+                <span className="growth-form-label">Agent name</span>
+                <input
+                  value={proposalDraft.agent_name}
+                  onChange={event => setProposalField('agent_name', safeSlug(event.target.value).startsWith('jarvis-') ? safeSlug(event.target.value) : `jarvis-${safeSlug(event.target.value)}`)}
+                  placeholder="jarvis-new-agent"
+                />
+              </label>
+              <label className="growth-form-field">
+                <span className="growth-form-label">Description</span>
+                <input
+                  value={proposalDraft.description}
+                  onChange={event => setProposalField('description', event.target.value)}
+                  placeholder="what does this agent do"
+                />
+              </label>
+              <label className="growth-form-field">
+                <span className="growth-form-label">Clone from</span>
+                <select value={proposalDraft.clone_from} onChange={event => setProposalField('clone_from', event.target.value)}>
+                  {agentNames.map(name => <option key={name} value={name}>{name}</option>)}
+                </select>
+              </label>
+              <div className="grid grid-cols-2 gap-2 min-w-0">
+                <label className="growth-form-field">
+                  <span className="growth-form-label">Provider</span>
+                  <select value={proposalDraft.provider} onChange={event => setProposalField('provider', event.target.value)}>
+                    <option value="">— pick —</option>
+                    {providers.map(provider => <option key={provider} value={provider}>{provider}</option>)}
+                  </select>
+                </label>
+                <label className="growth-form-field">
+                  <span className="growth-form-label">Model</span>
+                  <select value={proposalDraft.model} onChange={event => setProposalField('model', event.target.value)}>
+                    <option value="">— pick —</option>
+                    {modelOptions(proposalDraft.provider).map(model => <option key={model} value={model}>{model}</option>)}
+                  </select>
+                </label>
               </div>
-            ))}
-          </div>
+              <label className="growth-form-field">
+                <span className="growth-form-label">Notes</span>
+                <textarea
+                  value={proposalDraft.notes}
+                  onChange={event => setProposalField('notes', event.target.value)}
+                  placeholder="why this agent should exist"
+                  rows={2}
+                />
+              </label>
+              <div className="growth-form-field">
+                <span className="growth-form-label">Seed skills (optional)</span>
+                <RoleMatrixSkillPicker
+                  skills={skills}
+                  selected={proposalDraft.skills}
+                  onToggle={(name, on) => {
+                    setProposalDraftField('skills', on
+                      ? Array.from(new Set([...(proposalDraft.skills || []), name]))
+                      : (proposalDraft.skills || []).filter(n => n !== name));
+                  }}
+                  placeholder={`Search ${skills.length} skills…`}
+                  emptyMessage="No skills match."
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs text-gray-500 p-2">Loading proposal form…</div>
+          )}
+          {proposals.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-white/5">
+              <div className="text-[10px] uppercase tracking-widest text-gray-500 mb-2">
+                Recent proposals ({proposals.length})
+              </div>
+              <div className="space-y-2">
+                {proposals.slice(0, 4).map(proposal => (
+                  <div key={proposal.proposal_id} className="proposal-card">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-gray-100 truncate min-w-0">{proposal.request.agent_name}</span>
+                      <span className="mono text-[10px] text-amber-300 shrink-0">{proposal.status}</span>
+                    </div>
+                    <div className="text-[11px] text-gray-400 truncate">{proposal.request.provider} / {proposal.request.model}</div>
+                    <button type="button" className="danger-button mt-2 w-full" onClick={() => { setPendingRemove(proposal); setRemoveReason(''); }}>
+                      Remove with 7-day backup
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
-        <section className="growth-panel agent-graveyard-panel">
-          <div className="font-semibold text-gray-100">Removed Agents</div>
-          <div className="text-[11px] text-gray-400 mb-3">7-day recovery vault for agents removed from Agent Growth Studio.</div>
+        {/* ── Removed Agents (col 3) ───────────────────────────── */}
+        <section className="growth-section" data-testid="growth-section-removed">
+          <div className="growth-section-head">
+            <div>
+              <div className="growth-section-title">🗑 Removed Agents</div>
+              <div className="growth-section-sub">7-day recovery vault. Nothing is permanently deleted here.</div>
+            </div>
+          </div>
           <div className="removed-agent-list">
             {removedAgents.length ? removedAgents.slice(0, 8).map(removed => {
               const backupSkills = removed.backup?.assignment?.skills || removed.backup?.proposal?.request.skills || [];
               return (
                 <div key={removed.removed_id} className="removed-agent-card">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-gray-100">{removed.agent_name}</span>
-                    <span className={removed.status === 'removed' ? 'mono text-[10px] text-rose-300' : 'mono text-[10px] text-gray-400'}>{removed.status}</span>
+                    <span className="font-semibold text-gray-100 truncate min-w-0">{removed.agent_name}</span>
+                    <span className={removed.status === 'removed' ? 'mono text-[10px] text-rose-300 shrink-0' : 'mono text-[10px] text-gray-400 shrink-0'}>{removed.status}</span>
                   </div>
                   <div className="text-[11px] text-gray-400">Removed {new Date(removed.removed_at).toLocaleString()}</div>
-                  <div className="text-[11px] text-amber-300">{daysUntil(removed.expires_at)} days left before backup expiry</div>
+                  <div className="text-[11px] text-amber-300">{daysUntil(removed.expires_at)} days left</div>
                   <div className="text-[11px] text-cyan-300">{backupSkills.length} backed-up skills</div>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <button type="button" className="ghost-button" disabled={removed.status !== 'removed'} onClick={() => restoreAgent(removed)}>Restore</button>
-                    <button type="button" className="danger-button" disabled={removed.status === 'permanently_deleted'} onClick={() => permanentlyDeleteAgent(removed)}>Permanent delete</button>
+                    <button type="button" className="danger-button" disabled={removed.status === 'permanently_deleted'} onClick={() => permanentlyDeleteAgent(removed)}>Delete</button>
                   </div>
                 </div>
               );

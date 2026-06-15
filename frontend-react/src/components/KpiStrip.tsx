@@ -7,8 +7,6 @@
  *
  * Each KPI is just a number + a label. Optional color via `tone`.
  */
-import React from 'react';
-
 export type KpiTone = 'neutral' | 'good' | 'warn' | 'bad';
 
 export interface KpiItem {
